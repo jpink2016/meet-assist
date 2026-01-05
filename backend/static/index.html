@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Jakers Movie Rater</title>
+</head>
+<body>
+    <h1>Jake's Movie Rater</h1>
+
+    <h2>Add a Movie</h2>
+    <form id="movie-form">
+        <select id="movieTitle" required></select>
+        <input type="number" id="rating" placeholder="Rating (1-10)" min="1" max="10" required style="width:15ch;">
+        <button type="submit">Add Movie</button>
+    </form>
+
+    <h2>Leaderboard</h2>
+    <table id="leaderboard-table">
+        <thead>
+            <tr>
+                <th>Movie</th>
+                <th>Rating</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+    </table>
+
+    <!-- Link to external JS -->
+    <script src="/static/script.js"></script>
+</body>
+</html>
