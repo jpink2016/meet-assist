@@ -7,33 +7,76 @@
   <body>
     <h1>Athletes</h1>
 
-    <table border="1">
-      <thead>
-        <tr>
-          <th>athlete_id</th>
-          <th>team_id</th>
-          <th>varsity</th>
-          <th>first_name</th>
-          <th>last_name</th>
-          <th>unavailable_YN</th>
-          <th>expected_return</th>
-          <th>grad_year</th>
-          <th>is_active</th>
-          <th></th>
-        </tr>
-      </thead>
+    <section>
+      <h2>Add athlete</h2>
 
-      <tbody id="athletes-body"></tbody>
+      <div>
+        <label>First name:
+          <input id="firstName" autocomplete="off" />
+        </label>
 
-      <tfoot>
-        <tr>
-          <td>new</td>
-          <td><input id="firstName" /></td>
-          <td><input id="lastName" /></td>
-          <td><button id="addBtn">Add</button></td>
-        </tr>
-      </tfoot>
-    </table>
+        <label>Last name:
+          <input id="lastName" autocomplete="off" />
+        </label> 
+
+        <label>Team ID:
+          <input id="teamId" type="number" value="1" min="1" />
+        </label>
+
+        <label>Varsity (Y/N):
+          <select id="varsityYN">
+            <option value="Y">Y</option>
+            <option value="N" selected>N</option>
+          </select>
+        </label>
+
+        <label>Available (Y/N):
+          <select id="availableYN">
+            <option value="Y" selected>Y</option>
+            <option value="N">N</option>
+          </select>
+        </label>
+
+        <label>Expected return:
+          <input id="expectedReturn" type="date" />
+        </label>
+
+        <label>Grad year:
+          <input id="gradYear" type="number" min="2000" max="2100" />
+        </label>
+
+        <button id="addBtn" disabled>Add</button>
+        <span id="addStatus"></span>
+      </div>
+    </section>
+
+    <hr />
+
+    <section>
+      <h2>Roster</h2>
+
+      <label>
+        Show inactive (soft deleted):
+        <input type="checkbox" id="showInactive" />
+      </label>
+
+      <table border="1" style="margin-top: 10px;">
+        <thead>
+          <tr>
+            <th>first_name</th>
+            <th>last_name</th>
+            <th>athlete_id</th>
+            <th>team_id</th>
+            <th>varsity_YN</th>
+            <th>available_YN</th>
+            <th>expected_return</th>
+            <th>grad_year</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="athletes-body"></tbody>
+      </table>
+    </section>
 
     <script src="/static/athletes.js"></script>
   </body>
