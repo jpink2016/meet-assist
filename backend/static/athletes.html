@@ -69,29 +69,121 @@
     <section>
       <h2>Roster</h2>
 
-      <label>
-        Show inactive (soft deleted):
-        <input type="checkbox" id="showInactive" />
-      </label>
+      <div style="margin-bottom:10px;">
+        <label>
+          Search:
+          <input id="searchName" placeholder="name contains..." />
+        </label>
 
-      <table border="1" style="margin-top: 10px;">
-        <thead>
-          <tr>
-            <th>athlete_id</th>
-            <th>team</th>
-            <th>event_group</th>
-            <th>varsity_YN</th>
-            <th>first_name</th>
-            <th>last_name</th>
-            <th>gender</th>
-            <th>available_YN</th>
-            <th>expected_return</th>
-            <th>grad_year</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="athletes-body"></tbody>
-      </table>
+        <label>
+          Roster group:
+          <select id="filterTeam">
+            <option value="">All</option>
+          </select>
+        </label>
+
+        <label>
+          Event group:
+          <select id="filterEventGroup">
+            <option value="">All</option>
+          </select>
+        </label>
+
+        <label>
+          Gender:
+          <select id="filterGender">
+            <option value="">All</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+            <option value="X">X</option>
+          </select>
+        </label>
+
+        <label>
+          Available:
+          <select id="filterAvailable">
+            <option value="">All</option>
+            <option value="Y">Y</option>
+            <option value="N">N</option>
+          </select>
+        </label>
+
+        <label style="margin-left:10px;">
+          Show inactive (archived):
+          <input type="checkbox" id="showInactive" />
+        </label>
+      </div>
+
+      <div>
+        <div style="flex:1;">
+          <h3>Male</h3>
+          <table border="1" style="width:100%;">
+            <thead>
+              <tr>
+                <th>first_name</th>
+                <th>last_name</th>
+                <th>athlete_id</th>
+                <th>roster_group</th>
+                <th>event_group</th>
+                <th>gender</th>
+                <th>varsity_YN</th>
+                <th>available_YN</th>
+                <th>expected_return</th>
+                <th>grad_year</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="athletes-body-m"></tbody>
+          </table>
+        </div>
+
+        <div style="flex:1;">
+          <h3>Female</h3>
+          <table border="1" style="width:100%;">
+            <thead>
+              <tr>
+                <th>first_name</th>
+                <th>last_name</th>
+                <th>athlete_id</th>
+                <th>roster_group</th>
+                <th>event_group</th>
+                <th>gender</th>
+                <th>varsity_YN</th>
+                <th>available_YN</th>
+                <th>expected_return</th>
+                <th>grad_year</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="athletes-body-f"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="x-roster-section" style="margin-top:20px; display:none;">
+        <h3>X</h3>
+        <table border="1" style="width:100%;">
+          <thead>
+            <tr>
+              <th>first_name</th>
+              <th>last_name</th>
+              <th>athlete_id</th>
+              <th>roster_group</th>
+              <th>event_group</th>
+              <th>gender</th>
+              <th>varsity_YN</th>
+              <th>available_YN</th>
+              <th>expected_return</th>
+              <th>grad_year</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="athletes-body-x"></tbody>
+        </table>
+      </div>
     </section>
 
     <script src="/static/athletes.js"></script>

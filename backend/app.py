@@ -3,6 +3,7 @@ import os
 from flask import Flask, send_from_directory, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, inspect
+from datetime import date
 
 app = Flask(__name__, static_folder="static")
 
