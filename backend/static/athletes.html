@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html>
   <head>
@@ -10,44 +11,57 @@
     <section>
       <h2>Add athlete</h2>
 
-      <div>
-        <label>First name:
-          <input id="firstName" autocomplete="off" />
-        </label>
+      <label>First name:
+        <input id="firstName" autocomplete="off" />
+      </label>
 
-        <label>Last name:
-          <input id="lastName" autocomplete="off" />
-        </label> 
+      <label>Last name:
+        <input id="lastName" autocomplete="off" />
+      </label>
+      
+      <label>Gender:
+        <select id="genderSelect">
+          <option value="M">M</option>
+          <option value="F">F</option>
+          <option value="X">X</option>
+        </select>
+      </label>
+    </section>
 
-        <label>Team ID:
-          <input id="teamId" type="number" value="1" min="1" />
-        </label>
+    </section>
+      <label>Roster group:
+        <select id="teamSelect"></select>
+      </label>
 
-        <label>Varsity (Y/N):
-          <select id="varsityYN">
-            <option value="Y">Y</option>
-            <option value="N" selected>N</option>
-          </select>
-        </label>
+      <label>Event group:
+        <select id="eventGroupSelect"></select>
+      </label>
 
-        <label>Available (Y/N):
-          <select id="availableYN">
-            <option value="Y" selected>Y</option>
-            <option value="N">N</option>
-          </select>
-        </label>
+      <label>Varsity (Y/N):
+        <select id="varsityYN">
+          <option value="Y">Y</option>
+          <option value="N" selected>N</option>
+        </select>
+      </label>
 
-        <label>Expected return:
-          <input id="expectedReturn" type="date" />
-        </label>
 
-        <label>Grad year:
-          <input id="gradYear" type="number" min="2000" max="2100" />
-        </label>
+      <label>Available (Y/N):
+        <select id="availableYN">
+          <option value="Y" selected>Y</option>
+          <option value="N">N</option>
+        </select>
+      </label>
 
-        <button id="addBtn" disabled>Add</button>
-        <span id="addStatus"></span>
-      </div>
+      <label>Expected return:
+        <input id="expectedReturn" type="date" />
+      </label>
+
+      <label>Grad year:
+        <input id="gradYear" type="number" min="2000" max="2100" />
+      </label>
+
+      <button id="addBtn" disabled>Add</button>
+      <span id="addStatus"></span>
     </section>
 
     <hr />
@@ -63,11 +77,13 @@
       <table border="1" style="margin-top: 10px;">
         <thead>
           <tr>
+            <th>athlete_id</th>
+            <th>team</th>
+            <th>event_group</th>
+            <th>varsity_YN</th>
             <th>first_name</th>
             <th>last_name</th>
-            <th>athlete_id</th>
-            <th>team_id</th>
-            <th>varsity_YN</th>
+            <th>gender</th>
             <th>available_YN</th>
             <th>expected_return</th>
             <th>grad_year</th>

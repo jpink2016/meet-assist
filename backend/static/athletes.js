@@ -1,19 +1,24 @@
+
 document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("athletes-body");
 
   const addBtn = document.getElementById("addBtn");
   const addStatus = document.getElementById("addStatus");
-
   const showInactive = document.getElementById("showInactive");
 
   // Form elements
-  const teamIdEl = document.getElementById("teamId");
+  const teamSelect = document.getElementById("teamSelect");
+  const eventGroupSelect = document.getElementById("eventGroupSelect");
   const varsityEl = document.getElementById("varsityYN");
   const firstEl = document.getElementById("firstName");
   const lastEl = document.getElementById("lastName");
+  const genderSelect = document.getElementById("genderSelect");
   const availEl = document.getElementById("availableYN");
   const expectedEl = document.getElementById("expectedReturn");
   const gradEl = document.getElementById("gradYear");
+
+  let TEAMS = [];        // [{team_id, name}]
+  let EVENT_GROUPS = []; // [{event_group_id, name}]
 
   function escapeHtml(s) {
     return String(s ?? "")
@@ -24,22 +29,31 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#039;");
   }
 
+  function optionTags(items, idKey, labelKey, selectedId) {
+    return items
+      .map((it) => {
+        const id = it[idKey];
+        const label = it[labelKey];
+        const sel = String(id) === String(selectedId) ? "selected" : "";
+        return `<option value="${id}" ${sel}>${escapeHtml(label)}</option>`;
+      })
+      .join("");
+  }
+
   function isValidNewAthlete() {
     const first = firstEl.value.trim();
     const last = lastEl.value.trim();
-    const teamId = Number(teamIdEl.value);
 
     if (!first || !last) return false;
-    if (!Number.isInteger(teamId) || teamId < 1) return false;
+    if (!teamSelect.value) return false;
+    if (!eventGroupSelect.value) return false;
 
-    // grad year optional; if provided, validate range
     const grad = gradEl.value.trim();
     if (grad !== "") {
       const gy = Number(grad);
       if (!Number.isInteger(gy) || gy < 2000 || gy > 2100) return false;
     }
 
-    // varsity/available are selects, so always valid
     return true;
   }
 
@@ -47,10 +61,25 @@ document.addEventListener("DOMContentLoaded", () => {
     addBtn.disabled = !isValidNewAthlete();
   }
 
+  async function fetchJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Request failed: ${url}`);
+    return await res.json();
+  }
+
+  async function loadLookups() {
+    TEAMS = await fetchJSON("/api/teams");
+    EVENT_GROUPS = await fetchJSON("/api/event-groups");
+
+    teamSelect.innerHTML = optionTags(TEAMS, "team_id", "name", TEAMS[0]?.team_id);
+    eventGroupSelect.innerHTML = optionTags(EVENT_GROUPS, "event_group_id", "name", EVENT_GROUPS[0]?.event_group_id);
+
+    refreshAddButtonState();
+  }
+
   async function fetchAthletes() {
     const include = showInactive.checked ? "true" : "false";
-    const res = await fetch(`/api/athletes?include_inactive=${include}`);
-    return await res.json();
+    return await fetchJSON(`/api/athletes?include_inactive=${include}`);
   }
 
   async function loadAthletes() {
@@ -64,7 +93,15 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${a.athlete_id}</td>
 
         <td>
-          <input data-id="${a.athlete_id}" data-field="team_id" value="${a.team_id ?? ""}" size="6" />
+          <select data-id="${a.athlete_id}" data-field="team_id">
+            ${optionTags(TEAMS, "team_id", "name", a.team_id)}
+          </select>
+        </td>
+
+        <td>
+          <select data-id="${a.athlete_id}" data-field="event_group_id">
+            ${optionTags(EVENT_GROUPS, "event_group_id", "name", a.event_group_id)}
+          </select>
         </td>
 
         <td>
@@ -80,6 +117,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <td>
           <input data-id="${a.athlete_id}" data-field="last_name" value="${escapeHtml(a.last_name)}" />
+        </td>
+
+        <td>
+          <select data-id="${a.athlete_id}" data-field="gender">
+            <option value="M" ${a.gender === "M" ? "selected" : ""}>M</option>
+            <option value="F" ${a.gender === "F" ? "selected" : ""}>F</option>
+            <option value="X" ${a.gender === "X" ? "selected" : ""}>X</option>
+          </select>
         </td>
 
         <td>
@@ -101,10 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="status" data-status-for="${a.athlete_id}"></td>
       `;
 
-      // If athlete is inactive, lightly flag the row (no extra CSS file needed)
-      if (a.is_active === "N") {
-        tr.style.opacity = "0.55";
-      }
+      if (a.is_active === "N") tr.style.opacity = "0.55";
 
       tbody.appendChild(tr);
     }
@@ -142,18 +184,16 @@ document.addEventListener("DOMContentLoaded", () => {
   addBtn.addEventListener("click", async () => {
     if (!isValidNewAthlete()) return;
 
-    const first = firstEl.value.trim();
-    const last = lastEl.value.trim();
-
     const payload = {
-      team_id: teamIdEl.value,
+      team_id: teamSelect.value,
+      event_group_id: eventGroupSelect.value,
       varsity_yn: varsityEl.value,
-      first_name: first,
-      last_name: last,
+      first_name: firstEl.value.trim(),
+      last_name: lastEl.value.trim(),
+      gender: genderSelect.value,
       available_yn: availEl.value,
     };
 
-    // only include optional fields if provided
     if (expectedEl.value) payload.expected_return = expectedEl.value;
     if (gradEl.value.trim()) payload.grad_year = gradEl.value.trim();
 
@@ -161,7 +201,6 @@ document.addEventListener("DOMContentLoaded", () => {
       addStatus.textContent = "adding…";
       await createAthlete(payload);
 
-      // clear only the text fields + optionals; keep defaults for dropdowns/team
       firstEl.value = "";
       lastEl.value = "";
       expectedEl.value = "";
@@ -175,11 +214,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       addStatus.textContent = "error";
       alert(err.message);
-      refreshAddButtonState();
     }
   });
 
-  // Enter to submit (only when valid)
+  // Enter to submit from last name
   lastEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !addBtn.disabled) {
       e.preventDefault();
@@ -205,13 +243,13 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       statusCell.textContent = "error";
       alert(err.message);
-      await loadAthletes(); // revert UI to DB truth
+      await loadAthletes();
     }
   });
 
-  // Validate form & refresh button state on inputs
+  // Form validation wiring
   [
-    teamIdEl, varsityEl, firstEl, lastEl, availEl, expectedEl, gradEl
+    teamSelect, eventGroupSelect, varsityEl, firstEl, lastEl, genderSelect, availEl, expectedEl, gradEl
   ].forEach((el) => {
     el.addEventListener("input", refreshAddButtonState);
     el.addEventListener("change", refreshAddButtonState);
@@ -219,7 +257,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showInactive.addEventListener("change", loadAthletes);
 
-  // initial
-  refreshAddButtonState();
-  loadAthletes();
+  // init
+  (async () => {
+    await loadLookups();
+    await loadAthletes();
+    refreshAddButtonState();
+  })();
 });
