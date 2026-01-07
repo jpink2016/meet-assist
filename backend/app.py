@@ -3,6 +3,7 @@ import os
 from flask import Flask, send_from_directory, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, inspect
+from sqlalchemy.exc import IntegrityError
 from datetime import date
 
 app = Flask(__name__, static_folder="static")
@@ -16,6 +17,27 @@ db = SQLAlchemy(app)
 CURRENT_ORG_ID = int(os.environ.get("CURRENT_ORG_ID", "1"))
 CURRENT_ORG_NAME = os.environ.get("CURRENT_ORG_NAME", "Demo Org")
 
+def parse_bool(v, default=False):
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int):
+        return v != 0
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in {"true", "1", "yes", "y", "on"}:
+            return True
+        if s in {"false", "0", "no", "n", "off", ""}:
+            return False
+    raise ValueError("must be a boolean")
+
+    db.session.add_all(to_add)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # If anything already exists (shouldn't on brand-new meet), ignore gracefully
 
 class Organization(db.Model):
     __tablename__ = "organizations"
@@ -40,6 +62,7 @@ class EventGroup(db.Model):
     __tablename__ = "event_groups"
     event_group_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(120), nullable=False, unique=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
 
     def to_dict(self):
         return {"event_group_id": self.event_group_id, "name": self.name}
@@ -55,16 +78,16 @@ class Athlete(db.Model):
     team_id = db.Column(db.Integer, nullable=False, default=1)
     event_group_id = db.Column(db.Integer, nullable=False, default=1)
 
-    varsity_yn = db.Column(db.String(1), nullable=False, default="N")   # Y/N
+    varsity = db.Column(db.Boolean, nullable=False, default=False)   # Y/N
     first_name = db.Column(db.String(80), nullable=False)
     last_name = db.Column(db.String(80), nullable=False)
     gender = db.Column(db.String(1), nullable=False)  # M/F/X
 
-    available_yn = db.Column(db.String(1), nullable=False, default="Y") # Y/N
+    unavailable = db.Column(db.Boolean, nullable=False, default=False) 
     expected_return = db.Column(db.String(10), nullable=True)           # YYYY-MM-DD
     grad_year = db.Column(db.Integer, nullable=True)
 
-    is_active = db.Column(db.String(1), nullable=False, default="Y")    # soft delete
+    is_active = db.Column(db.Boolean, nullable=False, default=True)    # soft delete
 
     def to_dict(self):
         return {
@@ -72,36 +95,203 @@ class Athlete(db.Model):
             "org_id": self.org_id,
             "team_id": self.team_id,
             "event_group_id": self.event_group_id,
-            "varsity_yn": self.varsity_yn,
+            "varsity": self.varsity,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "gender": self.gender,
-            "available_yn": self.available_yn,
+            "unavailable": self.unavailable,
             "expected_return": self.expected_return,
             "grad_year": self.grad_year,
             "is_active": self.is_active,
         }
 
+class Event(db.Model):
+    __tablename__ = "events"
+    event_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    event_group_id = db.Column(db.Integer, db.ForeignKey("event_groups.event_group_id"), nullable=True)
+    name = db.Column(db.String(120), nullable=False)  # "100m", "Long Jump"
+    event_type = db.Column(db.String(10), nullable=False)  # track/field/relay
+    venue_type = db.Column(db.String(10), nullable=False, default="both")  # indoor/outdoor/both
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    def to_dict(self):
+        return {
+            "event_id": self.event_id,
+            "event_group_id": self.event_group_id,
+            "name": self.name,
+            "event_type": self.event_type,
+            "venue_type": self.venue_type,
+            "sort_order": self.sort_order,
+            "is_active": self.is_active,
+        }
+
+class Meet(db.Model):
+    __tablename__ = "meets"
+    meet_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    org_id = db.Column(db.Integer, nullable=False, default=CURRENT_ORG_ID, index=True)
+
+    name = db.Column(db.String(120), nullable=False)
+    meet_date = db.Column(db.String(10), nullable=True)  # 'YYYY-MM-DD'
+    location = db.Column(db.String(120), nullable=True)
+
+    is_varsity = db.Column(db.Boolean, nullable=False, default=False)
+    venue_type = db.Column(db.String(10), nullable=False, default="outdoor")  # indoor/outdoor
+    is_archived = db.Column(db.Boolean, nullable=False, default=False)
+
+    notes = db.Column(db.Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            "meet_id": self.meet_id,
+            "org_id": self.org_id,
+            "name": self.name,
+            "meet_date": self.meet_date,
+            "location": self.location,
+            "is_varsity": self.is_varsity,
+            "venue_type": self.venue_type,
+            "is_archived": self.is_archived,
+            "notes": self.notes,
+        }
+
+class MeetEvent(db.Model):
+    __tablename__ = "meet_events"
+    meet_event_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    meet_id = db.Column(db.Integer, db.ForeignKey("meets.meet_id", ondelete="CASCADE"), nullable=False, index=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("events.event_id"), nullable=False, index=True)
+
+    gender = db.Column(db.String(1), nullable=False)  # M/F
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+
+    max_entries = db.Column(db.Integer, nullable=True)
+    is_scored = db.Column(db.Boolean, nullable=False, default=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("meet_id", "event_id", "gender", name="uq_meet_event"),
+    )
+
+    def to_dict(self):
+        return {
+            "meet_event_id": self.meet_event_id,
+            "meet_id": self.meet_id,
+            "event_id": self.event_id,
+            "gender": self.gender,
+            "sort_order": self.sort_order,
+            "max_entries": self.max_entries,
+            "is_scored": self.is_scored,
+        }
+
+class MeetEntry(db.Model):
+    __tablename__ = "meet_entries"
+    meet_entry_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    meet_event_id = db.Column(
+        db.Integer,
+        db.ForeignKey("meet_events.meet_event_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    athlete_id = db.Column(
+        db.Integer,
+        db.ForeignKey("athletes.athlete_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    entry_status = db.Column(db.String(12), nullable=False, default="entered")  # entered/scratched
+
+    seed_time = db.Column(db.String(20), nullable=True)
+    seed_mark = db.Column(db.String(20), nullable=True)
+    heat = db.Column(db.Integer, nullable=True)
+    lane = db.Column(db.Integer, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("meet_event_id", "athlete_id", name="uq_meet_entry"),
+    )
+
+    def to_dict(self):
+        return {
+            "meet_entry_id": self.meet_entry_id,
+            "meet_event_id": self.meet_event_id,
+            "athlete_id": self.athlete_id,
+            "entry_status": self.entry_status,
+            "seed_time": self.seed_time,
+            "seed_mark": self.seed_mark,
+            "heat": self.heat,
+            "lane": self.lane,
+        }
+
+
+def autopopulate_meet_events(meet: "Meet"):
+    # optional: don't double-populate
+    if MeetEvent.query.filter_by(meet_id=meet.meet_id).first():
+        return
+
+    q = Event.query.filter_by(is_active=True)
+
+    venue = (meet.venue_type or "outdoor").strip().lower()
+    if venue == "indoor":
+        q = q.filter(Event.venue_type.in_(["indoor", "both"]))
+    else:
+        q = q.filter(Event.venue_type.in_(["outdoor", "both"]))
+
+    events = q.order_by(Event.sort_order.asc()).all()
+
+    to_add = []
+    for gender in ("M", "F"):
+        for ev in events:
+            to_add.append(MeetEvent(
+                meet_id=meet.meet_id,
+                event_id=ev.event_id,
+                gender=gender,
+                sort_order=ev.sort_order,
+                is_scored=True,
+            ))
+
+    db.session.add_all(to_add)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        # ignore duplicates if it somehow runs twice
+        return
+
+def get_event_group_id(name: str) -> int:
+    eg = EventGroup.query.filter_by(name=name).first()
+    if not eg:
+        eg = EventGroup(name=name)
+        db.session.add(eg)
+        db.session.flush()  # gets eg.event_group_id without commit
+    return eg.event_group_id
+
+
+
 
 def bootstrap_db():
     db.create_all()
 
-    insp = inspect(db.engine)
+    group_orders = {
+        "Sprints": 10,
+        "Hurdles": 20,
+        "Mid Distance": 30,
+        "Distance": 40,
+        "Relays": 50,
+        "Jumps": 60,
+        "PV": 70,
+        "Throws": 80,
+        "Multi": 90,
+    }
 
-    # Add missing columns to existing athletes table (SQLite)
-    if "athletes" in insp.get_table_names():
-        cols = {c["name"] for c in insp.get_columns("athletes")}
+    for name, order in group_orders.items():
+        eg = EventGroup.query.filter_by(name=name).first()
+        if eg:
+            eg.sort_order = order
 
-        if "org_id" not in cols:
-            db.session.execute(text("ALTER TABLE athletes ADD COLUMN org_id INTEGER NOT NULL DEFAULT 1"))
-            db.session.commit()
-
-        if "event_group_id" not in cols:
-            db.session.execute(text("ALTER TABLE athletes ADD COLUMN event_group_id INTEGER NOT NULL DEFAULT 1"))
-            db.session.commit()
-        if "gender" not in cols:
-            db.session.execute(text("ALTER TABLE athletes ADD COLUMN gender TEXT NOT NULL DEFAULT 'X'"))
-            db.session.commit()
+    db.session.commit()
 
     # Seed current org
     org = Organization.query.filter_by(org_id=CURRENT_ORG_ID).first()
@@ -112,31 +302,132 @@ def bootstrap_db():
 
     # Seed teams for org if none exist
     if Team.query.filter_by(org_id=CURRENT_ORG_ID).count() == 0:
-        seeds = ["Varsity","JV","Freshman"]
+        seeds = ["Varsity", "JV", "Freshman"]
         for name in seeds:
             db.session.add(Team(org_id=CURRENT_ORG_ID, name=name))
         db.session.commit()
 
     # Seed event groups if none exist
     if EventGroup.query.count() == 0:
-        for name in ["Sprints", "Mid Distance", "Distance", "Throws", "Jumps", "PV", "Multi"]:
+        for name in ["Sprints", "Mid Distance", "Distance", "Throws", "Jumps", "PV", "Multi", "Relays", "Hurdles"]:
             db.session.add(EventGroup(name=name))
         db.session.commit()
 
+    # Optional: avoid seeding demo data unless explicitly enabled
+    seed_demo = os.environ.get("SEED_DEMO_DATA", "1") == "1"
+
+    if not seed_demo:
+        return
+
+    def upsert_event(group_name, name, event_type, venue_type="both", sort_order=0):
+        eg_id = get_event_group_id(group_name)
+
+        existing = (Event.query
+            .filter_by(event_group_id=eg_id, name=name)
+            .first()
+        )
+
+        if existing:
+            existing.event_type = event_type
+            existing.venue_type = venue_type
+            existing.sort_order = sort_order
+            existing.is_active = True
+        else:
+            db.session.add(Event(
+                event_group_id=eg_id,
+                name=name,
+                event_type=event_type,
+                venue_type=venue_type,
+                sort_order=sort_order,
+                is_active=True,
+            ))
+    if os.environ.get("SEED_EVENTS", "0") == "1":
+        # Sprints / hurdles / distance / relays / jumps / throws
+        upsert_event("Sprints", "100m", "track", "outdoor", 10)
+        upsert_event("Sprints", "200m", "track", "both", 20)
+        upsert_event("Sprints", "400m", "track", "both", 30)
+
+        upsert_event("Hurdles", "110H/100H", "track", "outdoor", 40)
+        upsert_event("Hurdles", "300H", "track", "outdoor", 50)
+
+        upsert_event("Mid Distance", "800m", "track", "both", 60)
+        upsert_event("Distance", "1600m", "track", "both", 70)
+        upsert_event("Distance", "3200m", "track", "both", 80)
+
+        upsert_event("Relays", "4x100", "relay", "outdoor", 90)
+        upsert_event("Relays", "4x400", "relay", "outdoor", 100)
+        upsert_event("Relays", "4x800", "relay", "outdoor", 110)
+
+        upsert_event("Jumps", "Long Jump", "field", "both", 120)
+        upsert_event("Jumps", "Triple Jump", "field", "both", 130)
+        upsert_event("Jumps", "High Jump", "field", "both", 140)
+        upsert_event("PV", "Pole Vault", "field", "both", 150)
+
+        upsert_event("Throws", "Shot Put", "field", "both", 160)
+        upsert_event("Throws", "Discus", "field", "outdoor", 170)
+
+        db.session.commit()
+
+    # ---- Seed athletes (only if none for this org) ----
+    if Athlete.query.filter_by(org_id=CURRENT_ORG_ID).count() == 0:
+        # Grab some team ids (since you seed them above)
+        teams = Team.query.filter_by(org_id=CURRENT_ORG_ID).order_by(Team.team_id).all()
+        varsity_team_id = teams[0].team_id if teams else 1
+        jv_team_id = teams[1].team_id if len(teams) > 1 else varsity_team_id
+
+        # Use an existing event_group_id as default (since Athlete requires it)
+        sprints_id = get_event_group_id("Sprints")
+
+        seeds = [
+            # M
+            dict(first_name="Liam", last_name="Carter", gender="M", varsity=True,  team_id=varsity_team_id, grad_year=2026),
+            dict(first_name="Noah", last_name="Reed",   gender="M", varsity=False, team_id=jv_team_id,      grad_year=2027),
+            dict(first_name="Ethan",last_name="Brooks", gender="M", varsity=True,  team_id=varsity_team_id, grad_year=2025),
+
+            # F
+            dict(first_name="Ava",  last_name="Nguyen", gender="F", varsity=True,  team_id=varsity_team_id, grad_year=2026),
+            dict(first_name="Mia",  last_name="Parker", gender="F", varsity=False, team_id=jv_team_id,      grad_year=2027),
+            dict(first_name="Zoe",  last_name="Johnson",gender="F", varsity=True,  team_id=varsity_team_id, grad_year=2025),
+
+            # X (optional)
+            dict(first_name="Riley",last_name="Jordan", gender="X", varsity=False, team_id=jv_team_id,      grad_year=2027),
+        ]
+
+        for s in seeds:
+            db.session.add(Athlete(
+                org_id=CURRENT_ORG_ID,
+                team_id=s["team_id"],
+                event_group_id=sprints_id,
+                varsity=s["varsity"],
+                first_name=s["first_name"],
+                last_name=s["last_name"],
+                gender=s["gender"],
+                unavailable=False,
+                expected_return=None,
+                grad_year=s["grad_year"],
+                is_active=True,
+            ))
+
+        db.session.commit()
 
 with app.app_context():
     bootstrap_db()
-
 
 @app.get("/health")
 def health():
     return {"status": "ok"}, 200
 
+@app.get("/")
+def home():
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.get("/athletes")
 def athletes_page():
     return send_from_directory(app.static_folder, "athletes.html")
 
+@app.get("/meets")
+def meets_page():
+    return send_from_directory(app.static_folder, "meets.html")
 
 # ---------- Lookup APIs ----------
 
@@ -160,7 +451,7 @@ def list_athletes():
 
     q = Athlete.query.filter(Athlete.org_id == CURRENT_ORG_ID)
     if not include_inactive:
-        q = q.filter(Athlete.is_active == "Y")
+        q = q.filter(Athlete.is_active == True)
 
     athletes = q.order_by(Athlete.athlete_id.asc()).all()
     return jsonify([a.to_dict() for a in athletes]), 200
@@ -183,8 +474,8 @@ def create_athlete():
     # team/event group come from dropdowns; still validate
     team_id = data.get("team_id")
     event_group_id = data.get("event_group_id")
-    varsity_yn = data.get("varsity_yn", "N")
-    available_yn = data.get("available_yn", "Y")
+    varsity = data.get("varsity", False)
+    unavailable = data.get("unavailable", False)
     expected_return = data.get("expected_return") or None
     grad_year = data.get("grad_year", None)
 
@@ -204,10 +495,15 @@ def create_athlete():
     if EventGroup.query.filter_by(event_group_id=event_group_id).first() is None:
         return {"error": "event_group_id is not valid"}, 400
 
-    if varsity_yn not in {"Y", "N"}:
-        return {"error": "varsity_yn must be 'Y' or 'N'"}, 400
-    if available_yn not in {"Y", "N"}:
-        return {"error": "available_yn must be 'Y' or 'N'"}, 400
+    try:
+        varsity = parse_bool(data.get("varsity"), default=False)
+    except ValueError:
+        return {"error": "varsity must be True/False"}, 400
+
+    try:
+        unavailable = parse_bool(data.get("unavailable"), default=False)
+    except ValueError:
+        return {"error": "unavailable must be True/False"}, 400
 
     if grad_year in ("", None):
         grad_year = None
@@ -224,14 +520,14 @@ def create_athlete():
         org_id=CURRENT_ORG_ID,
         team_id=team_id,
         event_group_id=event_group_id,
-        varsity_yn=varsity_yn,
+        varsity=varsity,
         first_name=first,
         last_name=last,
         gender=gender,
-        available_yn=available_yn,
+        unavailable=unavailable,
         expected_return=expected_return,
         grad_year=grad_year,
-        is_active="Y",
+        is_active=True,
     )
     db.session.add(a)
     db.session.commit()
@@ -249,11 +545,11 @@ def update_athlete(athlete_id: int):
     allowed = {
         "team_id",
         "event_group_id",
-        "varsity_yn",
+        "varsity",
         "first_name",
         "last_name",
         "gender",
-        "available_yn",
+        "unavailable",
         "expected_return",
         "grad_year",
         "is_active",  # background for soft delete later
@@ -280,9 +576,11 @@ def update_athlete(athlete_id: int):
                 if v is None or EventGroup.query.filter_by(event_group_id=v).first() is None:
                     return {"error": "event_group_id is not valid"}, 400
 
-        if k in {"varsity_yn", "available_yn", "is_active"}:
-            if v not in {"Y", "N"}:
-                return {"error": f"{k} must be 'Y' or 'N'"}, 400
+        if k in {"varsity", "unavailable", "is_active"}:
+            try:
+                v = parse_bool(v)
+            except ValueError:
+                return {"error": f"{k} must be True or False"}, 400
 
         if k in {"first_name", "last_name"}:
             v = (v or "").strip()
@@ -301,6 +599,194 @@ def update_athlete(athlete_id: int):
     db.session.commit()
     return jsonify(a.to_dict()), 200
 
+# ------- meet apis ---------
 
+@app.get("/api/meets")
+def list_meets():
+    meets = (Meet.query
+             .filter_by(org_id=CURRENT_ORG_ID, is_archived=False)
+             .order_by(Meet.meet_date.desc().nullslast(), Meet.meet_id.desc())
+             .all())
+    return jsonify([m.to_dict() for m in meets])
+
+@app.post("/api/meets")
+def create_meet():
+    data = request.get_json(force=True) or {}
+    m = Meet(
+        org_id=CURRENT_ORG_ID,
+        name=(data.get("name") or "New Meet").strip(),
+        meet_date=data.get("meet_date"),
+        location=data.get("location"),
+        is_varsity=parse_bool(data.get("is_varsity"), False),
+        venue_type=(data.get("venue_type") or "outdoor").strip().lower(),
+    )
+    db.session.add(m)
+    db.session.commit()
+    autopopulate_meet_events(m)
+    return jsonify(m.to_dict()), 201
+
+# ------ events -----
+@app.get("/api/events")
+def list_events():
+    events = (Event.query
+              .filter_by(is_active=True)
+              .order_by(Event.sort_order.asc())
+              .all())
+    return jsonify([e.to_dict() for e in events])
+
+# add events to meet
+@app.post("/api/meets/<int:meet_id>/meet-events")
+def add_meet_event(meet_id):
+    data = request.get_json(force=True) or {}
+    gender = (data.get("gender") or "").strip().upper()
+    if gender not in {"M", "F"}:
+        return jsonify({"error": "gender must be M or F"}), 400
+
+    event_id = data.get("event_id")
+    if not event_id:
+        return jsonify({"error": "event_id required"}), 400
+
+    me = MeetEvent(
+        meet_id=meet_id,
+        event_id=int(event_id),
+        gender=gender,
+        sort_order=int(data.get("sort_order") or 0),
+    )
+    db.session.add(me)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "event already added for this meet+gender (or invalid ids)"}), 400
+
+    return jsonify(me.to_dict()), 201
+
+@app.get("/api/meets/<int:meet_id>/page")
+def meet_page_bootstrap(meet_id):
+    gender = (request.args.get("gender") or "M").upper()
+    if gender not in {"M", "F"}:
+        return jsonify({"error": "gender must be M or F"}), 400
+
+    meet = Meet.query.filter_by(meet_id=meet_id, org_id=CURRENT_ORG_ID).first_or_404()
+
+    # meet events for tab
+    meet_events = (db.session.query(MeetEvent, Event, EventGroup)
+        .join(Event, MeetEvent.event_id == Event.event_id)
+        .outerjoin(EventGroup, Event.event_group_id == EventGroup.event_group_id)
+        .filter(MeetEvent.meet_id == meet_id, MeetEvent.gender == gender)
+        .order_by(MeetEvent.sort_order.asc(), Event.sort_order.asc(), Event.name.asc())
+        .all()
+    )
+    meet_event_ids = [me.meet_event_id for (me, e, g) in meet_events]
+
+    # entries for those meet events
+    entries = []
+    if meet_event_ids:
+        entries = (db.session.query(MeetEntry, Athlete)
+            .join(Athlete, MeetEntry.athlete_id == Athlete.athlete_id)
+            .filter(MeetEntry.meet_event_id.in_(meet_event_ids), Athlete.org_id == CURRENT_ORG_ID)
+            .order_by(Athlete.last_name.asc(), Athlete.first_name.asc())
+            .all()
+        )
+
+    entries_by_meet_event = {}
+    for ent, ath in entries:
+        entries_by_meet_event.setdefault(ent.meet_event_id, []).append({
+            "athlete_id": ath.athlete_id,
+            "first_name": ath.first_name,
+            "last_name": ath.last_name,
+            "gender": ath.gender,
+        })
+
+    # athlete list for right side
+    athletes = (Athlete.query
+        .filter_by(org_id=CURRENT_ORG_ID, is_active=True, gender=gender)
+        .order_by(Athlete.last_name.asc(), Athlete.first_name.asc())
+        .all()
+    )
+
+    payload_meet_events = []
+    for me, ev, grp in meet_events:
+        payload_meet_events.append({
+            "meet_event_id": me.meet_event_id,
+            "event_id": ev.event_id,
+            "event_name": ev.name,
+            "event_group": (grp.name if grp else None),
+            "sort_order": me.sort_order,
+            "entries": entries_by_meet_event.get(me.meet_event_id, []),
+        })
+
+    return jsonify({
+        "meet": meet.to_dict(),
+        "gender": gender,
+        "meet_events": payload_meet_events,
+        "athletes": [a.to_dict() for a in athletes],
+    })
+
+
+@app.post("/api/meet-events/<int:meet_event_id>/entries")
+def add_entry(meet_event_id):
+    data = request.get_json(force=True) or {}
+    athlete_id = data.get("athlete_id")
+    if not athlete_id:
+        return jsonify({"error": "athlete_id required"}), 400
+
+    me = MeetEvent.query.get_or_404(meet_event_id)
+    ath = Athlete.query.filter_by(athlete_id=int(athlete_id), org_id=CURRENT_ORG_ID).first_or_404()
+
+    if ath.gender != me.gender:
+        return jsonify({"error": "athlete gender does not match event gender"}), 400
+
+    entry = MeetEntry(meet_event_id=meet_event_id, athlete_id=ath.athlete_id)
+    db.session.add(entry)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "athlete already entered in this event"}), 400
+
+    return jsonify(entry.to_dict()), 201
+
+
+@app.delete("/api/meet-events/<int:meet_event_id>/entries/<int:athlete_id>")
+def remove_entry(meet_event_id, athlete_id):
+    ent = MeetEntry.query.filter_by(meet_event_id=meet_event_id, athlete_id=athlete_id).first()
+    if not ent:
+        return jsonify({"ok": True})  # idempotent
+    db.session.delete(ent)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@app.patch("/api/meets/<int:meet_id>")
+def patch_meet(meet_id):
+    meet = Meet.query.filter_by(meet_id=meet_id, org_id=CURRENT_ORG_ID).first_or_404()
+    data = request.get_json(force=True) or {}
+
+    if "is_archived" in data:
+        meet.is_archived = parse_bool(data.get("is_archived"), meet.is_archived)
+
+    if "name" in data and data["name"] is not None:
+        meet.name = str(data["name"]).strip() or meet.name
+
+    db.session.commit()
+    return jsonify(meet.to_dict())
+
+
+@app.get("/api/debug/groups-and-events")
+def debug_groups_and_events():
+    rows = (db.session.query(EventGroup, Event)
+        .join(Event, Event.event_group_id == EventGroup.event_group_id)
+        .order_by(EventGroup.sort_order.asc(), Event.sort_order.asc(), Event.name.asc())
+        .all()
+    )
+    out = []
+    for g, e in rows:
+        out.append({
+            "group": g.name,
+            "group_sort": g.sort_order,
+            "event": e.name,
+            "event_sort": e.sort_order,
+        })
+    return jsonify(out)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

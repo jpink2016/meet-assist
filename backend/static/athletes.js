@@ -9,10 +9,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const teamSelect = document.getElementById("teamSelect");
   const eventGroupSelect = document.getElementById("eventGroupSelect");
   const genderSelect = document.getElementById("genderSelect");
-  const varsityEl = document.getElementById("varsityYN");
+  const varsityEl = document.getElementById("edit_varsity");
   const firstEl = document.getElementById("firstName");
   const lastEl = document.getElementById("lastName");
-  const availEl = document.getElementById("availableYN");
+  const availEl = document.getElementById("edit_unavailable");
   const expectedEl = document.getElementById("expectedReturn");
   const gradEl = document.getElementById("gradYear");
   const addBtn = document.getElementById("addBtn");
@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const filterTeam = document.getElementById("filterTeam");
   const filterEventGroup = document.getElementById("filterEventGroup");
   const filterGender = document.getElementById("filterGender");
-  const filterAvailable = document.getElementById("filterAvailable");
+  const filterUnavailable = document.getElementById("filterUnavailable");
   const showInactive = document.getElementById("showInactive");
 
   let TEAMS = [];
@@ -129,13 +129,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const teamId = filterTeam.value;
     const egId = filterEventGroup.value;
     const gender = filterGender.value;
-    const avail = filterAvailable.value;
+    const hideUnavailableOnly = filterUnavailable.checked;
 
     return ATHLETES.filter((a) => {
       if (teamId && String(a.team_id) !== String(teamId)) return false;
       if (egId && String(a.event_group_id) !== String(egId)) return false;
       if (gender && a.gender !== gender) return false;
-      if (avail && a.available_yn !== avail) return false;
+      if (hideUnavailableOnly && a.unavailable) return false;
 
       if (q) {
         const full = `${a.first_name} ${a.last_name}`.toLowerCase();
@@ -179,17 +179,21 @@ document.addEventListener("DOMContentLoaded", () => {
         </td>
 
         <td>
-          <select data-id="${a.athlete_id}" data-field="varsity_yn">
-            <option value="Y" ${a.varsity_yn === "Y" ? "selected" : ""}>Y</option>
-            <option value="N" ${a.varsity_yn === "N" ? "selected" : ""}>N</option>
-          </select>
+          <input
+            type="checkbox"
+            data-id="${a.athlete_id}"
+            data-field="varsity"
+            ${a.varsity ? "checked" : ""}
+          />
         </td>
 
         <td>
-          <select data-id="${a.athlete_id}" data-field="available_yn">
-            <option value="Y" ${a.available_yn === "Y" ? "selected" : ""}>Y</option>
-            <option value="N" ${a.available_yn === "N" ? "selected" : ""}>N</option>
-          </select>
+          <input
+            type="checkbox"
+            data-id="${a.athlete_id}"
+            data-field="unavailable"
+            ${a.unavailable ? "checked" : ""}
+          />
         </td>
 
         <td>
@@ -203,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <td>
           ${
-            a.is_active === "Y"
+            a.is_active
               ? `<button data-archive-id="${a.athlete_id}">Archive</button>`
               : `<button data-unarchive-id="${a.athlete_id}">Unarchive</button>`
           }
@@ -257,10 +261,10 @@ function renderTable() {
       team_id: teamSelect.value,
       event_group_id: eventGroupSelect.value,
       gender: genderSelect.value,
-      varsity_yn: varsityEl.value,
+      varsity: varsityEl.checked,
       first_name: firstEl.value.trim(),
       last_name: lastEl.value.trim(),
-      available_yn: availEl.value,
+      unavailable: availEl.checked,
     };
 
     if (expectedEl.value) payload.expected_return = expectedEl.value;
@@ -294,10 +298,15 @@ function renderTable() {
       const field = el.dataset.field;
       if (!id || !field) return;
 
+      const value =
+        el.type === "checkbox"
+          ? el.checked
+          : el.value;
+
       const statusCell = document.querySelector(`[data-status-for="${id}"]`);
       try {
         statusCell.textContent = "saving…";
-        await patchAthlete(id, { [field]: el.value });
+        await patchAthlete(id, { [field]: value });
         statusCell.textContent = "saved";
         setTimeout(() => (statusCell.textContent = ""), 800);
         await refreshRoster(); // optional, but keeps everything consistent
@@ -334,7 +343,7 @@ function renderTable() {
   });
 
   // Filters re-render without refetch (fast)
-  [searchName, filterTeam, filterEventGroup, filterGender, filterAvailable].forEach((el) => {
+  [searchName, filterTeam, filterEventGroup, filterGender, filterUnavailable].forEach((el) => {
     el.addEventListener("input", renderTable);
     el.addEventListener("change", renderTable);
   });
