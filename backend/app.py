@@ -616,6 +616,7 @@ def create_meet():
         location=data.get("location"),
         is_varsity=parse_bool(data.get("is_varsity"), False),
         venue_type=(data.get("venue_type") or "outdoor").strip().lower(),
+        notes=(str(data.get("notes")).strip() or None) if data.get("notes") is not None else None,
     )
     db.session.add(m)
     db.session.commit()
@@ -693,6 +694,7 @@ def meet_page_bootstrap(meet_id):
             "first_name": ath.first_name,
             "last_name": ath.last_name,
             "gender": ath.gender,
+            "unavailable": ath.unavailable,
         })
 
 
@@ -705,7 +707,7 @@ def meet_page_bootstrap(meet_id):
             Athlete.is_active == True,
             Athlete.gender == gender,
         )
-        .order_by(Athlete.last_name.asc(), Athlete.first_name.asc())
+        .order_by(EventGroup.sort_order.asc(), Athlete.last_name.asc(), Athlete.first_name.asc())
         .all()
     )
 
@@ -781,6 +783,23 @@ def patch_meet(meet_id):
     if "name" in data and data["name"] is not None:
         meet.name = str(data["name"]).strip() or meet.name
 
+    if "is_varsity" in data:
+        meet.is_varsity = parse_bool(data.get("is_varsity"), meet.is_varsity)
+
+    if "venue_type" in data:
+        meet.venue_type = (str(data["venue_type"]).strip() or None) if data["venue_type"] is not None else None
+
+    if "meet_date" in data:
+        meet.meet_date = (str(data["meet_date"]).strip() or None) if data["meet_date"] is not None else None
+
+    if "location" in data:
+        meet.location = (str(data["location"]).strip() or None) if data["location"] is not None else None
+
+    if "season" in data:
+        meet.season = (str(data["season"]).strip() or None) if data["season"] is not None else None
+
+    if "notes" in data:
+        meet.notes = (str(data["notes"]).strip() or None) if data["notes"] is not None else None
     db.session.commit()
     return jsonify(meet.to_dict())
 

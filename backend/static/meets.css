@@ -1,15 +1,105 @@
 
-tr.is-selected {
-  background: #f2f2f2;
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+.topbar { display:flex; gap:12px; align-items:center; margin-bottom: 16px; }
+.btn { padding: 8px 12px; border: 1px solid #ccc; border-radius: 10px; background: #fff; cursor: pointer; }
+.btn:hover { background: #f7f7f7; }
+.grid { display: grid; grid-template-columns: minmax(260px,360px) 1fr; gap: 16px; }
+.card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
+.muted { color: #666; font-size: 13px; }
+ul { list-style: none; padding: 0; margin: 0; }
+li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+li:hover { background: #fafafa; }
+#meetHeader strong {font-weight: 800;font-size: 18px;}
+.tabs { display:flex; gap:8px; margin: 8px 0; }
+.tab { padding: 6px 10px; border:1px solid #ccc; border-radius: 999px; cursor:pointer; background:#fff; }
+.tab.active { background:#f0f0f0; }
+.split { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.event { border:1px solid #eee; border-radius:10px; padding:10px; margin-bottom:10px; }
+.event.selected { border-color:#999; background:#fafafa; }
+.event.is-selected {background: #f2f2f2;border-color: #ddd;}
+.pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin: 4px 6px 0 0; }
+.row { display:flex; justify-content: space-between; align-items:center; }
+
+.field-hint {
+  color: #a00;
+  font-size: 12px;
+  margin-top: 4px;
 }
 
-tr.is-selected td {
-  opacity: 0.85;
+.input-error {
+  border-color: #a00 !important;
+}
+.modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal{
+  width: min(600px, 100%);
+}
+.pill-unavailable {
+  background: #fbeaea;
+  border-color: #f2caca;
+  color: #a00;
+  font-weight: 500;
+}
+.ath-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
-/* athlete already entered in this event */
-#athletesCol .event.is-selected {
-  background: #f2f2f2 !important;
-  opacity: 0.75;
+.ath-row-meta {
+  margin-top: 2px;
+  text-align: left;   /* makes sure it starts from the left edge */
 }
 
+.badge {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid #ddd;
+}
+
+.badge-unavailable {
+  background: #fbeaea;
+  border-color: #f2caca;
+  color: #a00;
+  font-weight: 600;
+}
+.event-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;           /* space between name and group */
+}
+
+.event-group {
+  font-size: 12px;    /* smaller than event name */
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  height: 70vh;            /* controls how tall the area is */
+}
+
+.scroll-col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: 4px;      /* avoids scrollbar overlap */
+}
+
+.scroll-col > .row,
+.scroll-col > strong,
+.scroll-col > .muted {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}

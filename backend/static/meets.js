@@ -10,6 +10,8 @@ const elStatus = document.getElementById("status");
 const elMeetHeader = document.getElementById("meetHeader");
 const elMeetEditor = document.getElementById("meetEditor");
 const elMeetActions = document.getElementById("meetActions");
+const elMeetMeta = document.getElementById("meetMeta");
+const elMeetNotes = document.getElementById("meetNotes");
 
 const elEventsCol = document.getElementById("eventsCol");
 const elAthletesCol = document.getElementById("athletesCol");
@@ -17,6 +19,19 @@ const elAthletesCol = document.getElementById("athletesCol");
 const btnNewMeet = document.getElementById("btnNewMeet");
 const btnAddEvent = document.getElementById("btnAddEvent");
 const btnArchiveMeet = document.getElementById("btnArchiveMeet");
+
+const createBackdrop = document.getElementById("meetCreateBackdrop");
+const btnCloseCreate = document.getElementById("btnCloseCreate");
+const btnCreateMeetSave = document.getElementById("btnCreateMeetSave");
+
+const cName = document.getElementById("cName");
+const cVarsity = document.getElementById("cVarsity");
+const cVenue = document.getElementById("cVenue");
+const cDate = document.getElementById("cDate");
+const cLocation = document.getElementById("cLocation");
+//const cSeason = document.getElementById("cSeason");
+const cNotes = document.getElementById("cNotes");
+const hint = document.getElementById("cNameHint");
 
 function getSelectedAthleteIdSet(meetEvents, selectedMeetEventId) {
   const me = meetEvents.find(x => String(x.meet_event_id) === String(selectedMeetEventId));
@@ -62,19 +77,66 @@ async function loadMeets() {
   setStatus("");
 }
 
-btnNewMeet.addEventListener("click", async () => {
-  const name = prompt("Meet name?", "New Meet");
-  if (name == null) return;
+function openCreateMeetModal() {
+  cName.value = "";
+  cVarsity.checked = true;
+  cVenue.value = "";
+  cDate.value = "";
+  cLocation.value = "";
+  //cSeason.value = "";
+  cNotes.value = "";
+  createBackdrop.style.display = "flex";
+}
+
+function closeCreateMeetModal() {
+  createBackdrop.style.display = "none";
+}
+
+btnNewMeet.addEventListener("click", openCreateMeetModal);
+btnCloseCreate.addEventListener("click", closeCreateMeetModal);
+createBackdrop.addEventListener("click", (e) => {
+  if (e.target === createBackdrop) closeCreateMeetModal();
+});
+
+btnCreateMeetSave.addEventListener("click", async () => {
+  const name = cName.value.trim();
+  // reset errors
+  cName.classList.remove("input-error");
+  hint.style.display = "none";
+
+  if (!name) {
+    cName.classList.add("input-error");
+    hint.style.display = "block";
+    cName.focus();
+    return;
+  }
 
   setStatus("creating meet…");
-  const meet = await api("/api/meets", {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-  setStatus("");
-  await loadMeets();
-  await openMeet(meet.meet_id);
+  try {
+    const meet = await api("/api/meets", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        is_varsity: cVarsity.checked,
+        venue_type: cVenue.value.trim() || null,
+        meet_date: cDate.value || null,
+        location: cLocation.value.trim() || null,
+        //season: cSeason.value.trim() || null,
+        notes: cNotes.value.trim() || null,
+      }),
+    });
+
+    closeCreateMeetModal();
+    setStatus("");
+    await loadMeets();
+    await openMeet(meet.meet_id);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    setStatus("");
+  }
 });
+
 
 btnArchiveMeet.addEventListener("click", async () => {
   if (!currentMeetId || !currentMeet) return;
@@ -104,6 +166,7 @@ btnArchiveMeet.addEventListener("click", async () => {
       elMeetEditor.style.display = "none";
       elMeetActions.style.display = "none";
       elMeetHeader.textContent = "Meet archived. Select another meet on the left.";
+      elMeetMeta.textContent = null;
     } else {
       // If you later show archived meets somewhere, you could reload the meet page
       await loadMeetPage();
@@ -137,6 +200,22 @@ async function loadMeetPage() {
 
   elMeetHeader.innerHTML = `<strong>${data.meet.name}</strong> <span class="muted">(${data.gender === "M" ? "Boys" : "Girls"})</span>`;
   elMeetEditor.style.display = "block";
+  
+  function capitalize(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+  const metaParts = [
+    data.meet.venue_type ? `${capitalize(data.meet.venue_type)}` : null,
+    data.meet.meet_date ? `${data.meet.meet_date}` : null,
+    data.meet.location ? `${data.meet.location}` : null,
+    data.meet.season ? `${data.meet.season}` : null,
+    (data.meet.is_varsity ? "Varsity" : null),
+  ].filter(Boolean);
+
+  elMeetMeta.textContent = metaParts.join(" • ");
+
+  // notes (only show if present)
+  elMeetNotes.textContent = data.meet.notes ? `Notes: ${data.meet.notes}` : "";
 
   elMeetActions.style.display = "flex";
   btnArchiveMeet.textContent = currentMeet.is_archived ? "Unarchive" : "Archive";
@@ -160,20 +239,28 @@ function renderEvents(meetEvents) {
     const div = document.createElement("div");
     div.className = "event" + (me.meet_event_id === selectedMeetEventId ? " selected" : "");
     div.dataset.meetEventId = me.meet_event_id;
-
     const entriesHtml = (me.entries || [])
-      .map((a) => `<span class="pill" data-athlete-id="${a.athlete_id}">${a.last_name}, ${a.first_name}</span>`)
+      .map((a) => `
+        <span
+          class="pill${a.unavailable ? " pill-unavailable" : ""}"
+          data-athlete-id="${a.athlete_id}"
+        >
+          ${a.last_name}, ${a.first_name}
+        </span>
+      `)
       .join("");
 
     div.innerHTML = `
       <div class="row">
-        <div>
+        <div class="event-title-row">
           <strong>${me.event_name}</strong>
-          <div class="muted">${me.event_group || ""}</div>
+          <span class="muted event-group">${me.event_group || ""}</span>
         </div>
         <div class="muted">#${me.meet_event_id}</div>
       </div>
-      <div style="margin-top:8px;">${entriesHtml || `<span class="muted">No entries</span>`}</div>
+      <div style="margin-top:8px;">
+        ${entriesHtml || `<span class="muted">No entries</span>`}
+      </div>
     `;
 
     div.addEventListener("click", () => {
@@ -209,9 +296,18 @@ function renderAthletes(athletes, selectedSet = new Set()) {
 
     const isSelected = selectedSet.has(String(a.athlete_id));
     div.className = `event${isSelected ? " is-selected" : ""}`; // reuse styling
+    const meta = [a.event_group_name,a.team_name].filter(Boolean).join(" • ");
+    const badge = a.unavailable
+      ? `<span class="badge badge-unavailable">Unavailable</span>`
+      : "";
 
-    const label = [a.team_name, a.event_group_name].filter(Boolean).join(" • ");
-    div.innerHTML = `<strong>${a.last_name}, ${a.first_name}</strong> <span class="muted">${label}</span>`;
+    div.innerHTML = `
+      <div class="ath-row-top">
+        <strong>${a.last_name}, ${a.first_name}</strong>
+        ${badge}
+      </div>
+      <div class="muted ath-row-meta">${meta}</div>
+    `;
 
     div.addEventListener("click", async () => {
       if (!selectedMeetEventId) {

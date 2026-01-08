@@ -5,28 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Meets</title>
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
-      .topbar { display:flex; gap:12px; align-items:center; margin-bottom: 16px; }
-      .btn { padding: 8px 12px; border: 1px solid #ccc; border-radius: 10px; background: #fff; cursor: pointer; }
-      .btn:hover { background: #f7f7f7; }
-      .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
-      .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
-      .muted { color: #666; font-size: 13px; }
-      ul { list-style: none; padding: 0; margin: 0; }
-      li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
-      li:hover { background: #fafafa; }
-      #meetHeader strong {font-weight: 800;font-size: 18px;}
-      .tabs { display:flex; gap:8px; margin: 8px 0; }
-      .tab { padding: 6px 10px; border:1px solid #ccc; border-radius: 999px; cursor:pointer; background:#fff; }
-      .tab.active { background:#f0f0f0; }
-      .split { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .event { border:1px solid #eee; border-radius:10px; padding:10px; margin-bottom:10px; }
-      .event.selected { border-color:#999; background:#fafafa; }
-      .event.is-selected {background: #f2f2f2;border-color: #ddd;}
-      .pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin: 4px 6px 0 0; }
-      .row { display:flex; justify-content: space-between; align-items:center; }
-    </style>
+    <link rel="stylesheet" href="/static/meets.css">
   </head>
   <body>
     <div class="topbar">
@@ -50,11 +29,14 @@
       <div class="card">
         <div class="row">
           <div id="meetHeader">Select a meet on the left</div>
+          <div id="meetMeta" class="muted" style="margin-top:6px;"></div>
           <div id="meetActions" style="display:none; gap:8px; align-items:center;">
             <button class="btn" id="btnArchiveMeet">Archive</button>
           </div>
         </div>
 
+        <div id="meetNotes" class="muted" style="margin-top:6px; white-space:pre-wrap;"></div>
+      
         <div id="meetEditor" style="display:none;">
           <div class="tabs">
             <button class="tab active" data-gender="M">Boys</button>
@@ -62,7 +44,7 @@
           </div>
 
           <div class="split">
-            <div>
+            <div class="scroll-col">
               <div class="row">
                 <strong>Events</strong>
                 <button class="btn" id="btnAddEvent">+ Add Event</button>
@@ -70,7 +52,7 @@
               <div id="eventsCol" style="margin-top:10px;"></div>
             </div>
 
-            <div>
+            <div class="scroll-col">
               <strong>Athletes</strong>
               <div class="muted">Click an athlete to add to the selected event</div>
               <div id="athletesCol" style="margin-top:10px;"></div>
@@ -84,6 +66,63 @@
       </div>
     </div>
 
+    <div id="meetCreateBackdrop" class="modal-backdrop" style="display:none;">
+      <div class="card modal">
+        <div class="row">
+          <strong>New Meet</strong>
+          <button class="btn" id="btnCloseCreate">Close</button>
+        </div>
+
+        <div style="margin-top:10px; display:grid; gap:10px;">
+          <label>
+            <div class="muted">Name</div>
+            <input id="cName" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+            <div id="cNameHint" class="field-hint" style="display:none;">Name is required</div>
+          </label>
+
+          <label style="display:flex; gap:10px; align-items:center;">
+            <input id="cVarsity" type="checkbox" checked>
+            <span>Varsity meet</span>
+          </label>
+
+          <label>
+            <div class="muted">Venue type</div>
+            <select id="cVenue" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+              <option value="">— Select venue —</option>
+              <option value="outdoor">Outdoor</option>
+              <option value="indoor">Indoor</option>
+            </select>
+          </label>
+
+          <label>
+            <div class="muted">Meet date</div>
+            <input id="cDate" type="date" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+          </label>
+
+          <label>
+            <div class="muted">Location</div>
+            <input id="cLocation" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+          </label>
+
+          <!-- 
+          <label>
+            <div class="muted">Season</div>
+            <input id="cSeason" placeholder="2026 Outdoor" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+          </label> 
+          -->
+
+          <label>
+            <div class="muted">Notes</div>
+            <textarea id="cNotes" rows="4" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;"></textarea>
+          </label>
+
+          <div class="row">
+            <div></div>
+            <button class="btn" id="btnCreateMeetSave">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <script src="/static/meets.js"></script>
   </body>
 </html>
