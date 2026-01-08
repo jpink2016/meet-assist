@@ -3,6 +3,7 @@ let currentMeetId = null;
 let currentGender = "M";
 let selectedMeetEventId = null;
 let currentMeet = null;
+let selectedAthleteIds = new Set(); // athlete_id strings
 
 const elMeetList = document.getElementById("meetList");
 const elStatus = document.getElementById("status");
@@ -17,6 +18,11 @@ const btnNewMeet = document.getElementById("btnNewMeet");
 const btnAddEvent = document.getElementById("btnAddEvent");
 const btnArchiveMeet = document.getElementById("btnArchiveMeet");
 
+function getSelectedAthleteIdSet(meetEvents, selectedMeetEventId) {
+  const me = meetEvents.find(x => String(x.meet_event_id) === String(selectedMeetEventId));
+  const ids = (me?.entries || []).map(e => String(e.athlete_id));
+  return new Set(ids);
+}
 function setStatus(msg) {
   elStatus.textContent = msg || "";
 }
@@ -136,7 +142,8 @@ async function loadMeetPage() {
   btnArchiveMeet.textContent = currentMeet.is_archived ? "Unarchive" : "Archive";
 
   renderEvents(data.meet_events);
-  renderAthletes(data.athletes);
+  const selectedSet = getSelectedAthleteIdSet(data.meet_events, selectedMeetEventId);
+  renderAthletes(data.athletes, selectedSet);
 
   setStatus("");
 }
@@ -189,7 +196,7 @@ function renderEvents(meetEvents) {
   });
 }
 
-function renderAthletes(athletes) {
+function renderAthletes(athletes, selectedSet = new Set()) {
   elAthletesCol.innerHTML = "";
 
   if (!athletes.length) {
@@ -199,13 +206,21 @@ function renderAthletes(athletes) {
 
   athletes.forEach((a) => {
     const div = document.createElement("div");
-    div.className = "event"; // reuse styling
+
+    const isSelected = selectedSet.has(String(a.athlete_id));
+    div.className = `event${isSelected ? " is-selected" : ""}`; // reuse styling
+
     div.innerHTML = `<strong>${a.last_name}, ${a.first_name}</strong> <span class="muted">${a.varsity ? "Varsity" : "JV"}</span>`;
+
     div.addEventListener("click", async () => {
       if (!selectedMeetEventId) {
         alert("Click an event first (left side).");
         return;
       }
+
+      // optional: prevent duplicate add spam
+      if (isSelected) return;
+
       try {
         await api(`/api/meet-events/${selectedMeetEventId}/entries`, {
           method: "POST",
@@ -216,6 +231,7 @@ function renderAthletes(athletes) {
         alert(e.message);
       }
     });
+
     elAthletesCol.appendChild(div);
   });
 }

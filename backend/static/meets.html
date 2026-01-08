@@ -16,12 +16,14 @@
       ul { list-style: none; padding: 0; margin: 0; }
       li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
       li:hover { background: #fafafa; }
+      #meetHeader strong {font-weight: 800;font-size: 18px;}
       .tabs { display:flex; gap:8px; margin: 8px 0; }
       .tab { padding: 6px 10px; border:1px solid #ccc; border-radius: 999px; cursor:pointer; background:#fff; }
       .tab.active { background:#f0f0f0; }
       .split { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .event { border:1px solid #eee; border-radius:10px; padding:10px; margin-bottom:10px; }
       .event.selected { border-color:#999; background:#fafafa; }
+      .event.is-selected {background: #f2f2f2;border-color: #ddd;}
       .pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin: 4px 6px 0 0; }
       .row { display:flex; justify-content: space-between; align-items:center; }
     </style>
@@ -47,7 +49,7 @@
       <!-- Right: meet editor -->
       <div class="card">
         <div class="row">
-          <div id="meetHeader" class="muted">Select a meet on the left</div>
+          <div id="meetHeader">Select a meet on the left</div>
           <div id="meetActions" style="display:none; gap:8px; align-items:center;">
             <button class="btn" id="btnArchiveMeet">Archive</button>
           </div>

@@ -1,0 +1,15 @@
+
+tr.is-selected {
+  background: #f2f2f2;
+}
+
+tr.is-selected td {
+  opacity: 0.85;
+}
+
+/* athlete already entered in this event */
+#athletesCol .event.is-selected {
+  background: #f2f2f2 !important;
+  opacity: 0.75;
+}
+
