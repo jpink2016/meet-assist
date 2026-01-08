@@ -86,7 +86,7 @@ function openCreateMeetModal() {
   btnCreateMeetSave.textContent = "Create";
 
   cName.value = "";
-  cVarsity.checked = true;
+  cVarsity.checked = false;
   cVenue.value = "";
   cDate.value = "";
   cLocation.value = "";
