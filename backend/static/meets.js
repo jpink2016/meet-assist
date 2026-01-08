@@ -210,7 +210,8 @@ function renderAthletes(athletes, selectedSet = new Set()) {
     const isSelected = selectedSet.has(String(a.athlete_id));
     div.className = `event${isSelected ? " is-selected" : ""}`; // reuse styling
 
-    div.innerHTML = `<strong>${a.last_name}, ${a.first_name}</strong> <span class="muted">${a.varsity ? "Varsity" : "JV"}</span>`;
+    const label = [a.team_name, a.event_group_name].filter(Boolean).join(" • ");
+    div.innerHTML = `<strong>${a.last_name}, ${a.first_name}</strong> <span class="muted">${label}</span>`;
 
     div.addEventListener("click", async () => {
       if (!selectedMeetEventId) {

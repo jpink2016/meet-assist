@@ -2,7 +2,7 @@
 import os
 from flask import Flask, send_from_directory, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, inspect
+from sqlalchemy import text, inspect, and_
 from sqlalchemy.exc import IntegrityError
 from datetime import date
 
@@ -267,9 +267,6 @@ def get_event_group_id(name: str) -> int:
         db.session.add(eg)
         db.session.flush()  # gets eg.event_group_id without commit
     return eg.event_group_id
-
-
-
 
 def bootstrap_db():
     db.create_all()
@@ -698,12 +695,28 @@ def meet_page_bootstrap(meet_id):
             "gender": ath.gender,
         })
 
-    # athlete list for right side
-    athletes = (Athlete.query
-        .filter_by(org_id=CURRENT_ORG_ID, is_active=True, gender=gender)
+
+    # athlete list for right side (with names)
+    ath_rows = (db.session.query(Athlete, Team, EventGroup)
+        .outerjoin(Team, and_(Athlete.team_id == Team.team_id, Team.org_id == CURRENT_ORG_ID))
+        .outerjoin(EventGroup, Athlete.event_group_id == EventGroup.event_group_id)
+        .filter(
+            Athlete.org_id == CURRENT_ORG_ID,
+            Athlete.is_active == True,
+            Athlete.gender == gender,
+        )
         .order_by(Athlete.last_name.asc(), Athlete.first_name.asc())
         .all()
     )
+
+    payload_athletes = []
+    for a, t, g in ath_rows:
+        payload_athletes.append({
+            **a.to_dict(),
+            "team_name": (t.name if t else None),
+            "event_group_name": (g.name if g else None),
+        })
+
 
     payload_meet_events = []
     for me, ev, grp in meet_events:
@@ -720,7 +733,7 @@ def meet_page_bootstrap(meet_id):
         "meet": meet.to_dict(),
         "gender": gender,
         "meet_events": payload_meet_events,
-        "athletes": [a.to_dict() for a in athletes],
+        "athletes": payload_athletes,
     })
 
 
