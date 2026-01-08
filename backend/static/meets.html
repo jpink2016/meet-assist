@@ -31,6 +31,7 @@
           <div id="meetHeader">Select a meet on the left</div>
           <div id="meetMeta" class="muted" style="margin-top:6px;"></div>
           <div id="meetActions" style="display:none; gap:8px; align-items:center;">
+            <button class="btn" id="btnEditMeet">Edit</button>
             <button class="btn" id="btnArchiveMeet">Archive</button>
           </div>
         </div>
@@ -69,7 +70,7 @@
     <div id="meetCreateBackdrop" class="modal-backdrop" style="display:none;">
       <div class="card modal">
         <div class="row">
-          <strong>New Meet</strong>
+          <strong id="meetModalTitle">New Meet</strong>
           <button class="btn" id="btnCloseCreate">Close</button>
         </div>
 

@@ -4,6 +4,7 @@ let currentGender = "M";
 let selectedMeetEventId = null;
 let currentMeet = null;
 let selectedAthleteIds = new Set(); // athlete_id strings
+let meetModalMode = "create"; // "create" | "edit"
 
 const elMeetList = document.getElementById("meetList");
 const elStatus = document.getElementById("status");
@@ -23,6 +24,8 @@ const btnArchiveMeet = document.getElementById("btnArchiveMeet");
 const createBackdrop = document.getElementById("meetCreateBackdrop");
 const btnCloseCreate = document.getElementById("btnCloseCreate");
 const btnCreateMeetSave = document.getElementById("btnCreateMeetSave");
+const btnEditMeet = document.getElementById("btnEditMeet");
+const meetModalTitle = document.getElementById("meetModalTitle");
 
 const cName = document.getElementById("cName");
 const cVarsity = document.getElementById("cVarsity");
@@ -78,6 +81,10 @@ async function loadMeets() {
 }
 
 function openCreateMeetModal() {
+    meetModalMode = "create";
+  meetModalTitle.textContent = "New Meet";
+  btnCreateMeetSave.textContent = "Create";
+
   cName.value = "";
   cVarsity.checked = true;
   cVenue.value = "";
@@ -87,6 +94,31 @@ function openCreateMeetModal() {
   cNotes.value = "";
   createBackdrop.style.display = "flex";
 }
+
+function openEditMeetModal() {
+  if (!currentMeetId || !currentMeet) return;
+
+  meetModalMode = "edit";
+  meetModalTitle.textContent = "Edit Meet";
+  btnCreateMeetSave.textContent = "Save";
+
+  cName.value = currentMeet.name || "";
+  cVarsity.checked = !!currentMeet.is_varsity;
+  cVenue.value = currentMeet.venue_type || "";     // "indoor"/"outdoor"
+  cDate.value = currentMeet.meet_date || "";
+  cLocation.value = currentMeet.location || "";
+  //cSeason.value = currentMeet.season || "";
+  cNotes.value = currentMeet.notes || "";
+
+  // clear any old validation UI
+  cName.classList.remove("input-error");
+  hint.style.display = "none";
+
+  createBackdrop.style.display = "flex";
+}
+
+btnEditMeet.addEventListener("click", openEditMeetModal);
+
 
 function closeCreateMeetModal() {
   createBackdrop.style.display = "none";
@@ -100,6 +132,7 @@ createBackdrop.addEventListener("click", (e) => {
 
 btnCreateMeetSave.addEventListener("click", async () => {
   const name = cName.value.trim();
+
   // reset errors
   cName.classList.remove("input-error");
   hint.style.display = "none";
@@ -111,32 +144,43 @@ btnCreateMeetSave.addEventListener("click", async () => {
     return;
   }
 
-  setStatus("creating meet…");
-  try {
-    const meet = await api("/api/meets", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        is_varsity: cVarsity.checked,
-        venue_type: cVenue.value.trim() || null,
-        meet_date: cDate.value || null,
-        location: cLocation.value.trim() || null,
-        //season: cSeason.value.trim() || null,
-        notes: cNotes.value.trim() || null,
-      }),
-    });
+  const payload = {
+    name,
+    is_varsity: cVarsity.checked,
+    venue_type: cVenue.value || null,          // if dropdown
+    meet_date: cDate.value || null,
+    location: cLocation.value.trim() || null,
+    //season: cSeason.value.trim() || null,
+    notes: cNotes.value.trim() || null,
+  };
 
-    closeCreateMeetModal();
-    setStatus("");
-    await loadMeets();
-    await openMeet(meet.meet_id);
+  try {
+    setStatus(meetModalMode === "create" ? "creating meet…" : "saving…");
+
+    if (meetModalMode === "create") {
+      const meet = await api("/api/meets", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      closeCreateMeetModal();
+      await loadMeets();
+      await openMeet(meet.meet_id);
+    } else {
+      const updated = await api(`/api/meets/${currentMeetId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      currentMeet = updated;
+      closeCreateMeetModal();
+      await loadMeetPage();
+      await loadMeets(); // optional if list shows location/date, etc.
+    }
   } catch (e) {
     alert(e.message);
   } finally {
     setStatus("");
   }
 });
-
 
 btnArchiveMeet.addEventListener("click", async () => {
   if (!currentMeetId || !currentMeet) return;
