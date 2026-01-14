@@ -156,6 +156,7 @@ class Meet(db.Model):
             "is_varsity": self.is_varsity,
             "venue_type": self.venue_type,
             "is_archived": self.is_archived,
+            "season_id": self.season_id,
             "notes": self.notes,
         }
 
@@ -227,12 +228,21 @@ class MeetEntry(db.Model):
             "lane": self.lane,
         }
 
+
 class Season(db.Model):
     __tablename__ = "seasons"
     season_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)          # "2025 Outdoor"
     year = db.Column(db.Integer, nullable=False)             # 2025
     discipline = db.Column(db.String(20), nullable=False)    # "outdoor"/"indoor"/"xc"
+
+    def to_dict(self):
+        return {
+            "season_id": self.season_id,
+            "name": self.name,
+            "year": self.year,
+            "discipline": self.discipline,
+        }
 
 def autopopulate_meet_events(meet: "Meet"):
     # optional: don't double-populate
@@ -662,15 +672,49 @@ def patch_meet(meet_id):
     if "location" in data:
         meet.location = (str(data["location"]).strip() or None) if data["location"] is not None else None
 
-    if "season" in data:
-        meet.season = (str(data["season"]).strip() or None) if data["season"] is not None else None
+    if "season_id" in data:
+        v = data.get("season_id")
 
+        # allow clearing
+        if v in ("", None):
+            meet.season_id = None
+        else:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return {"error": "season_id must be an integer or null"}, 400
+
+            if Season.query.get(v) is None:
+                return {"error": "season_id is not valid"}, 400
+
+            meet.season_id = v
     if "notes" in data:
         meet.notes = (str(data["notes"]).strip() or None) if data["notes"] is not None else None
     db.session.commit()
     return jsonify(meet.to_dict())
 
+@app.get("/api/seasons")
+def list_seasons():
+    q = Season.query
 
+    year = request.args.get("year")
+    if year not in (None, ""):
+        try:
+            q = q.filter(Season.year == int(year))
+        except ValueError:
+            return {"error": "year must be an integer"}, 400
+
+    discipline = (request.args.get("discipline") or "").strip().lower()
+    if discipline:
+        q = q.filter(Season.discipline == discipline)
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        # SQLite: ilike is okay; this keeps it simple
+        q = q.filter(Season.name.ilike(f"%{search}%"))
+
+    seasons = q.order_by(Season.year.desc(), Season.name.asc()).all()
+    return jsonify([s.to_dict() for s in seasons]), 200
 @app.get("/api/debug/groups-and-events")
 def debug_groups_and_events():
     rows = (db.session.query(EventGroup, Event)
@@ -687,5 +731,76 @@ def debug_groups_and_events():
             "event_sort": e.sort_order,
         })
     return jsonify(out)
+
+@app.post("/api/seasons")
+def create_season():
+    data = request.get_json(silent=True) or {}
+
+    name = (data.get("name") or "").strip()
+    discipline = (data.get("discipline") or "").strip().lower()
+    year = data.get("year")
+
+    if not name:
+        return {"error": "name is required"}, 400
+
+    if discipline not in {"outdoor", "indoor", "xc"}:
+        return {"error": "discipline must be one of: outdoor, indoor, xc"}, 400
+
+    try:
+        year = int(year)
+    except (TypeError, ValueError):
+        return {"error": "year must be an integer"}, 400
+
+    # Optional: prevent exact duplicates
+    existing = Season.query.filter_by(name=name, year=year, discipline=discipline).first()
+    if existing:
+        return jsonify(existing.to_dict()), 200
+
+    s = Season(name=name, year=year, discipline=discipline)
+    db.session.add(s)
+    db.session.commit()
+    return jsonify(s.to_dict()), 201
+
+@app.patch("/api/seasons/<int:season_id>")
+def update_season(season_id: int):
+    s = Season.query.get_or_404(season_id)
+    data = request.get_json(silent=True) or {}
+
+    if "name" in data and data["name"] is not None:
+        name = str(data["name"]).strip()
+        if not name:
+            return {"error": "name cannot be empty"}, 400
+        s.name = name
+
+    if "discipline" in data and data["discipline"] is not None:
+        discipline = str(data["discipline"]).strip().lower()
+        if discipline not in {"outdoor", "indoor", "xc"}:
+            return {"error": "discipline must be one of: outdoor, indoor, xc"}, 400
+        s.discipline = discipline
+
+    if "year" in data and data["year"] is not None:
+        try:
+            s.year = int(data["year"])
+        except (TypeError, ValueError):
+            return {"error": "year must be an integer"}, 400
+
+    db.session.commit()
+    return jsonify(s.to_dict()), 200
+
+@app.delete("/api/seasons/<int:season_id>")
+def delete_season(season_id: int):
+    s = Season.query.get_or_404(season_id)
+
+    # If you have Meet.season_id FK:
+    in_use = Meet.query.filter_by(season_id=season_id).count() > 0
+    if in_use:
+        return {"error": "season is in use by meets; cannot delete"}, 400
+
+    db.session.delete(s)
+    db.session.commit()
+    return jsonify({"ok": True}), 200
+
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
