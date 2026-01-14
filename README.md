@@ -4,8 +4,13 @@
 
 ```bash
 cd meet-assist
+
 docker build -t meet-assist .
-docker run --rm -p 5001:5000 meet-assist
+docker run --rm -p 5001:5000 \
+  -e DB_PATH=/data/meet_assist.db \
+  -v meet_assist_data:/data \
+  meet-assist
+
 ```
 
 Open: http://localhost:5001/athletes

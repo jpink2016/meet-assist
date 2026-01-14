@@ -222,6 +222,19 @@ btnArchiveMeet.addEventListener("click", async () => {
     setStatus("");
   }
 });
+// -------------athlete event count function
+function buildAthleteEntryCountMap(meetEvents = []) {
+  const counts = new Map(); // key: String(athlete_id) -> number
+
+  meetEvents.forEach((me) => {
+    (me.entries || []).forEach((a) => {
+      const key = String(a.athlete_id);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+  });
+
+  return counts;
+}
 
 // -------------------- Meet editor --------------------
 async function openMeet(meetId) {
@@ -266,7 +279,8 @@ async function loadMeetPage() {
 
   renderEvents(data.meet_events);
   const selectedSet = getSelectedAthleteIdSet(data.meet_events, selectedMeetEventId);
-  renderAthletes(data.athletes, selectedSet);
+  const entryCountMap = buildAthleteEntryCountMap(data.meet_events);
+  renderAthletes(data.athletes, selectedSet, entryCountMap);
 
   setStatus("");
 }
@@ -327,7 +341,7 @@ function renderEvents(meetEvents) {
   });
 }
 
-function renderAthletes(athletes, selectedSet = new Set()) {
+function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new Map()) {
   elAthletesCol.innerHTML = "";
 
   if (!athletes.length) {
@@ -337,19 +351,20 @@ function renderAthletes(athletes, selectedSet = new Set()) {
 
   athletes.forEach((a) => {
     const div = document.createElement("div");
-
+    const athleteIdStr = String(a.athlete_id); 
     const isSelected = selectedSet.has(String(a.athlete_id));
     div.className = `event${isSelected ? " is-selected" : ""}`; // reuse styling
     const meta = [a.event_group_name,a.team_name].filter(Boolean).join(" • ");
-    const badge = a.unavailable
-      ? `<span class="badge badge-unavailable">Unavailable</span>`
-      : "";
+    const badge = a.unavailable ? `<span class="badge badge-unavailable">Unavailable</span>` : "";
+    const count = entryCountMap.get(athleteIdStr) || 0;
+    const countText = `${count} - Events Entered`;
 
     div.innerHTML = `
       <div class="ath-row-top">
         <strong>${a.last_name}, ${a.first_name}</strong>
         ${badge}
       </div>
+      <div class="muted ath-row-sub">${countText}</div>
       <div class="muted ath-row-meta">${meta}</div>
     `;
 
