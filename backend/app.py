@@ -8,9 +8,11 @@ from datetime import date
 
 app = Flask(__name__, static_folder="static")
 
-DB_PATH = os.environ.get("DB_PATH", "/app/backend/meet_assist.db")
+DB_PATH = os.environ.get("DB_PATH", "/data/meet_assist.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+print("USING DATABASE:", app.config["SQLALCHEMY_DATABASE_URI"], flush=True)
 
 db = SQLAlchemy(app)
 
@@ -141,6 +143,7 @@ class Meet(db.Model):
     venue_type = db.Column(db.String(10), nullable=False, default="outdoor")  # indoor/outdoor
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
+    season_id = db.Column(db.Integer, db.ForeignKey("seasons.season_id"), nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
     def to_dict(self):
@@ -224,6 +227,12 @@ class MeetEntry(db.Model):
             "lane": self.lane,
         }
 
+class Season(db.Model):
+    __tablename__ = "seasons"
+    season_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)          # "2025 Outdoor"
+    year = db.Column(db.Integer, nullable=False)             # 2025
+    discipline = db.Column(db.String(20), nullable=False)    # "outdoor"/"indoor"/"xc"
 
 def autopopulate_meet_events(meet: "Meet"):
     # optional: don't double-populate
@@ -267,148 +276,6 @@ def get_event_group_id(name: str) -> int:
         db.session.add(eg)
         db.session.flush()  # gets eg.event_group_id without commit
     return eg.event_group_id
-
-def bootstrap_db():
-    db.create_all()
-
-    group_orders = {
-        "Sprints": 10,
-        "Hurdles": 20,
-        "Mid Distance": 30,
-        "Distance": 40,
-        "Relays": 50,
-        "Jumps": 60,
-        "PV": 70,
-        "Throws": 80,
-        "Multi": 90,
-    }
-
-    for name, order in group_orders.items():
-        eg = EventGroup.query.filter_by(name=name).first()
-        if eg:
-            eg.sort_order = order
-
-    db.session.commit()
-
-    # Seed current org
-    org = Organization.query.filter_by(org_id=CURRENT_ORG_ID).first()
-    if not org:
-        org = Organization(org_id=CURRENT_ORG_ID, name=CURRENT_ORG_NAME)
-        db.session.add(org)
-        db.session.commit()
-
-    # Seed teams for org if none exist
-    if Team.query.filter_by(org_id=CURRENT_ORG_ID).count() == 0:
-        seeds = ["Varsity", "JV", "Freshman"]
-        for name in seeds:
-            db.session.add(Team(org_id=CURRENT_ORG_ID, name=name))
-        db.session.commit()
-
-    # Seed event groups if none exist
-    if EventGroup.query.count() == 0:
-        for name in ["Sprints", "Mid Distance", "Distance", "Throws", "Jumps", "PV", "Multi", "Relays", "Hurdles"]:
-            db.session.add(EventGroup(name=name))
-        db.session.commit()
-
-    # Optional: avoid seeding demo data unless explicitly enabled
-    seed_demo = os.environ.get("SEED_DEMO_DATA", "1") == "1"
-
-    if not seed_demo:
-        return
-
-    def upsert_event(group_name, name, event_type, venue_type="both", sort_order=0):
-        eg_id = get_event_group_id(group_name)
-
-        existing = (Event.query
-            .filter_by(event_group_id=eg_id, name=name)
-            .first()
-        )
-
-        if existing:
-            existing.event_type = event_type
-            existing.venue_type = venue_type
-            existing.sort_order = sort_order
-            existing.is_active = True
-        else:
-            db.session.add(Event(
-                event_group_id=eg_id,
-                name=name,
-                event_type=event_type,
-                venue_type=venue_type,
-                sort_order=sort_order,
-                is_active=True,
-            ))
-    if os.environ.get("SEED_EVENTS", "0") == "1":
-        # Sprints / hurdles / distance / relays / jumps / throws
-        upsert_event("Sprints", "100m", "track", "outdoor", 10)
-        upsert_event("Sprints", "200m", "track", "both", 20)
-        upsert_event("Sprints", "400m", "track", "both", 30)
-
-        upsert_event("Hurdles", "110H/100H", "track", "outdoor", 40)
-        upsert_event("Hurdles", "300H", "track", "outdoor", 50)
-
-        upsert_event("Mid Distance", "800m", "track", "both", 60)
-        upsert_event("Distance", "1600m", "track", "both", 70)
-        upsert_event("Distance", "3200m", "track", "both", 80)
-
-        upsert_event("Relays", "4x100", "relay", "outdoor", 90)
-        upsert_event("Relays", "4x400", "relay", "outdoor", 100)
-        upsert_event("Relays", "4x800", "relay", "outdoor", 110)
-
-        upsert_event("Jumps", "Long Jump", "field", "both", 120)
-        upsert_event("Jumps", "Triple Jump", "field", "both", 130)
-        upsert_event("Jumps", "High Jump", "field", "both", 140)
-        upsert_event("PV", "Pole Vault", "field", "both", 150)
-
-        upsert_event("Throws", "Shot Put", "field", "both", 160)
-        upsert_event("Throws", "Discus", "field", "outdoor", 170)
-
-        db.session.commit()
-
-    # ---- Seed athletes (only if none for this org) ----
-    if Athlete.query.filter_by(org_id=CURRENT_ORG_ID).count() == 0:
-        # Grab some team ids (since you seed them above)
-        teams = Team.query.filter_by(org_id=CURRENT_ORG_ID).order_by(Team.team_id).all()
-        varsity_team_id = teams[0].team_id if teams else 1
-        jv_team_id = teams[1].team_id if len(teams) > 1 else varsity_team_id
-
-        # Use an existing event_group_id as default (since Athlete requires it)
-        sprints_id = get_event_group_id("Sprints")
-
-        seeds = [
-            # M
-            dict(first_name="Liam", last_name="Carter", gender="M", varsity=True,  team_id=varsity_team_id, grad_year=2026),
-            dict(first_name="Noah", last_name="Reed",   gender="M", varsity=False, team_id=jv_team_id,      grad_year=2027),
-            dict(first_name="Ethan",last_name="Brooks", gender="M", varsity=True,  team_id=varsity_team_id, grad_year=2025),
-
-            # F
-            dict(first_name="Ava",  last_name="Nguyen", gender="F", varsity=True,  team_id=varsity_team_id, grad_year=2026),
-            dict(first_name="Mia",  last_name="Parker", gender="F", varsity=False, team_id=jv_team_id,      grad_year=2027),
-            dict(first_name="Zoe",  last_name="Johnson",gender="F", varsity=True,  team_id=varsity_team_id, grad_year=2025),
-
-            # X (optional)
-            dict(first_name="Riley",last_name="Jordan", gender="X", varsity=False, team_id=jv_team_id,      grad_year=2027),
-        ]
-
-        for s in seeds:
-            db.session.add(Athlete(
-                org_id=CURRENT_ORG_ID,
-                team_id=s["team_id"],
-                event_group_id=sprints_id,
-                varsity=s["varsity"],
-                first_name=s["first_name"],
-                last_name=s["last_name"],
-                gender=s["gender"],
-                unavailable=False,
-                expected_return=None,
-                grad_year=s["grad_year"],
-                is_active=True,
-            ))
-
-        db.session.commit()
-
-with app.app_context():
-    bootstrap_db()
 
 @app.get("/health")
 def health():

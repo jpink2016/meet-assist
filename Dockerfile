@@ -9,5 +9,5 @@ COPY backend /app/backend
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "backend.app:app", "--workers", "2", "--threads", "4", "--timeout", "60"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "backend.app:app", "--workers", "1", "--threads", "4", "--timeout", "60"]
 
