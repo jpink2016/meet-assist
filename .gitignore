@@ -29,4 +29,6 @@ alembic.log
 *.log
 
 
+# Postgres local data
+pgdata/
 

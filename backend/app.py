@@ -8,8 +8,12 @@ from datetime import date
 
 app = Flask(__name__, static_folder="static")
 
-DB_PATH = os.environ.get("DB_PATH", "/data/meet_assist.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+else:
+    DB_PATH = os.environ.get("DB_PATH", "/data/meet_assist.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 print("USING DATABASE:", app.config["SQLALCHEMY_DATABASE_URI"], flush=True)

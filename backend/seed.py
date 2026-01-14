@@ -2,12 +2,87 @@
 import os
 from backend.app import (
     app, db,
-    Organization, Team, EventGroup, Event, Athlete,
+    Organization, Team, EventGroup, Event, Athlete, Season,
     CURRENT_ORG_ID, CURRENT_ORG_NAME,
     get_event_group_id,
 )
 
+from sqlalchemy import and_
+
+def seed_athletes():
+    # Only seed if no athletes exist for this org
+    if Athlete.query.filter_by(org_id=CURRENT_ORG_ID).count() > 0:
+        return
+
+    # Grab teams
+    teams = Team.query.filter_by(org_id=CURRENT_ORG_ID).order_by(Team.team_id).all()
+    varsity_team_id = teams[0].team_id if teams else 1
+    jv_team_id = teams[1].team_id if len(teams) > 1 else varsity_team_id
+
+    # Pick a default event group (required FK)
+    sprints = EventGroup.query.filter_by(name="Sprints").first()
+    event_group_id = sprints.event_group_id if sprints else 1
+
+    athletes = [
+        # ---- Males ----
+        ("Liam", "Carter", "M", True,  varsity_team_id, 2026),
+        ("Noah", "Reed",   "M", False, jv_team_id,      2027),
+        ("Ethan","Brooks", "M", True,  varsity_team_id, 2025),
+        ("Jack", "Miller", "M", False, jv_team_id,      2028),
+        ("Owen", "Hayes",  "M", True,  varsity_team_id, 2026),
+
+        # ---- Females ----
+        ("Ava",  "Nguyen", "F", True,  varsity_team_id, 2026),
+        ("Mia",  "Parker", "F", False, jv_team_id,      2027),
+        ("Zoe",  "Johnson","F", True,  varsity_team_id, 2025),
+        ("Ella", "Brown",  "F", False, jv_team_id,      2028),
+        ("Lily", "Martinez","F", True, varsity_team_id, 2026),
+
+        # ---- X ----
+        ("Riley","Jordan", "X", False, jv_team_id,      2027),
+    ]
+
+    for first, last, gender, varsity, team_id, grad_year in athletes:
+        db.session.add(Athlete(
+            org_id=CURRENT_ORG_ID,
+            team_id=team_id,
+            event_group_id=event_group_id,
+            varsity=varsity,
+            first_name=first,
+            last_name=last,
+            gender=gender,
+            unavailable=False,
+            expected_return=None,
+            grad_year=grad_year,
+            is_active=True,
+        ))
+
+    db.session.commit()
+
 def seed():
+    seed_athletes()
+    seasons = [
+        {"name": "2024 Outdoor", "year": 2024, "discipline": "outdoor"},
+        {"name": "2024 Indoor",  "year": 2024, "discipline": "indoor"},
+        {"name": "2025 Outdoor", "year": 2025, "discipline": "outdoor"},
+    ]
+
+    for s in seasons:
+        exists = (
+            Season.query
+            .filter_by(
+                name=s["name"],
+                year=s["year"],
+                discipline=s["discipline"]
+            )
+            .first()
+        )
+        if not exists:
+            db.session.add(Season(**s))
+
+    db.session.commit()
+
+
     group_orders = {
         "Sprints": 10,
         "Hurdles": 20,
