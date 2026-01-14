@@ -38,13 +38,6 @@ def parse_bool(v, default=False):
             return False
     raise ValueError("must be a boolean")
 
-    db.session.add_all(to_add)
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        # If anything already exists (shouldn't on brand-new meet), ignore gracefully
-
 class Organization(db.Model):
     __tablename__ = "organizations"
     org_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -57,7 +50,7 @@ class Organization(db.Model):
 class Team(db.Model):
     __tablename__ = "teams"
     team_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    org_id = db.Column(db.Integer, nullable=False, index=True)
+    org_id = db.Column(db.Integer, db.ForeignKey("organizations.org_id"), nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
 
     def to_dict(self):
@@ -79,10 +72,10 @@ class Athlete(db.Model):
 
     athlete_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 
-    org_id = db.Column(db.Integer, nullable=False, default=CURRENT_ORG_ID)
+    org_id = db.Column(db.Integer, db.ForeignKey("organizations.org_id"), nullable=False, index=True)
 
-    team_id = db.Column(db.Integer, nullable=False, default=1)
-    event_group_id = db.Column(db.Integer, nullable=False, default=1)
+    team_id = db.Column(db.Integer, db.ForeignKey("teams.team_id"), nullable=False)
+    event_group_id = db.Column(db.Integer, db.ForeignKey("event_groups.event_group_id"), nullable=False)
 
     varsity = db.Column(db.Boolean, nullable=False, default=False)   # Y/N
     first_name = db.Column(db.String(80), nullable=False)
@@ -137,7 +130,7 @@ class Meet(db.Model):
     __tablename__ = "meets"
     meet_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 
-    org_id = db.Column(db.Integer, nullable=False, default=CURRENT_ORG_ID, index=True)
+    org_id = db.Column(db.Integer, db.ForeignKey("organizations.org_id"), nullable=False, index=True)
 
     name = db.Column(db.String(120), nullable=False)
     meet_date = db.Column(db.String(10), nullable=True)  # 'YYYY-MM-DD'
@@ -235,6 +228,8 @@ class MeetEntry(db.Model):
 
 class Season(db.Model):
     __tablename__ = "seasons"
+    __table_args__ = (db.UniqueConstraint("year", "discipline", "name", name="uq_season_name_year_disc"),)
+
     season_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)          # "2025 Outdoor"
     year = db.Column(db.Integer, nullable=False)             # 2025
@@ -516,6 +511,9 @@ def list_events():
 # add events to meet
 @app.post("/api/meets/<int:meet_id>/meet-events")
 def add_meet_event(meet_id):
+    meet = Meet.query.filter_by(meet_id=meet_id, org_id=CURRENT_ORG_ID).first()
+    if not meet:
+        return jsonify({"error": "meet not found"}), 404
     data = request.get_json(force=True) or {}
     gender = (data.get("gender") or "").strip().upper()
     if gender not in {"M", "F"}:
@@ -627,7 +625,10 @@ def add_entry(meet_event_id):
     if not athlete_id:
         return jsonify({"error": "athlete_id required"}), 400
 
-    me = MeetEvent.query.get_or_404(meet_event_id)
+    me = (db.session.query(MeetEvent)
+        .join(Meet, MeetEvent.meet_id == Meet.meet_id)
+        .filter(MeetEvent.meet_event_id == meet_event_id,Meet.org_id == CURRENT_ORG_ID)
+        .first_or_404())
     ath = Athlete.query.filter_by(athlete_id=int(athlete_id), org_id=CURRENT_ORG_ID).first_or_404()
 
     if ath.gender != me.gender:
@@ -646,7 +647,15 @@ def add_entry(meet_event_id):
 
 @app.delete("/api/meet-events/<int:meet_event_id>/entries/<int:athlete_id>")
 def remove_entry(meet_event_id, athlete_id):
-    ent = MeetEntry.query.filter_by(meet_event_id=meet_event_id, athlete_id=athlete_id).first()
+    ent = (db.session.query(MeetEntry)
+           .join(MeetEvent, MeetEntry.meet_event_id == MeetEvent.meet_event_id)
+           .join(Meet, MeetEvent.meet_id == Meet.meet_id)
+           .filter(
+               MeetEntry.meet_event_id == meet_event_id,
+               MeetEntry.athlete_id == athlete_id,
+               Meet.org_id == CURRENT_ORG_ID,
+           )
+           .first())
     if not ent:
         return jsonify({"ok": True})  # idempotent
     db.session.delete(ent)
@@ -687,10 +696,8 @@ def patch_meet(meet_id):
                 v = int(v)
             except (TypeError, ValueError):
                 return {"error": "season_id must be an integer or null"}, 400
-
-            if Season.query.get(v) is None:
+            if db.session.get(Season, v) is None:
                 return {"error": "season_id is not valid"}, 400
-
             meet.season_id = v
     if "notes" in data:
         meet.notes = (str(data["notes"]).strip() or None) if data["notes"] is not None else None
@@ -805,7 +812,10 @@ def delete_season(season_id: int):
     db.session.commit()
     return jsonify({"ok": True}), 200
 
-
+@app.get("/api/org")
+def current_org():
+    org = Organization.query.get(CURRENT_ORG_ID)
+    return jsonify(org.to_dict() if org else {"org_id": CURRENT_ORG_ID, "name": None})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

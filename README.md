@@ -36,7 +36,7 @@ docker run --rm -it \
   -v "$PWD/backend:/app/backend" \
   -w /app/backend \
   -e PYTHONPATH=/app \
-  -e DATABASE_URL="<database_url>" \
+  -e DATABASE_URL="postgresql+psycopg2://meet:meetpass@host.docker.internal:5432/meetassist" \
   meet-assist \
   alembic revision --autogenerate -m "describe change"
 
