@@ -33,7 +33,7 @@ const cVarsity = document.getElementById("cVarsity");
 const cVenue = document.getElementById("cVenue");
 const cDate = document.getElementById("cDate");
 const cLocation = document.getElementById("cLocation");
-//const cSeason = document.getElementById("cSeason");
+const cSeason = document.getElementById("cSeason");
 const cNotes = document.getElementById("cNotes");
 const hint = document.getElementById("cNameHint");
 
@@ -66,39 +66,27 @@ async function loadSeasons() {
   return seasonsCache;
 }
 
-function renderMeetSeasonSelect(meet) {
-  const sel = document.getElementById("selMeetSeason");
-  if (!sel) return;
+async function populateSeasonSelect(selectEl, selectedSeasonId = null) {
+  if (!selectEl) return;
 
-  // Build options
-  const options = [
-    `<option value="">No season</option>`,
-    ...seasonsCache.map((s) => {
-      const label = `${s.year} ${s.discipline.toUpperCase()} — ${s.name}`;
-      const selected = String(meet.season_id ?? "") === String(s.season_id) ? "selected" : "";
-      return `<option value="${s.season_id}" ${selected}>${label}</option>`;
-    }),
-  ];
+  const seasons = await loadSeasons();
 
-  sel.innerHTML = options.join("");
+  selectEl.innerHTML = `<option value="">— No Season —</option>`;
 
-  // Ensure we don't double-bind handlers if loadMeetPage reruns
-  sel.onchange = async () => {
-    const v = sel.value; // "" or "123"
-    try {
-      await api(`/api/meets/${meet.meet_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ season_id: v === "" ? null : Number(v) }),
-      });
-      // reload to keep everything consistent (and so selection persists)
-      await loadMeetPage();
-    } catch (e) {
-      alert(e.message || "Failed to update season");
-      // revert UI back to previous value
-      renderMeetSeasonSelect(meet);
+  seasons.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.season_id;
+
+    // nicer label
+    opt.textContent = s.name;
+
+    if (String(s.season_id) === String(selectedSeasonId)) {
+      opt.selected = true;
     }
-  };
+    selectEl.appendChild(opt);
+  });
 }
+
 
 // -------------------- Meets list --------------------
 async function loadMeets() {
@@ -123,8 +111,8 @@ async function loadMeets() {
   setStatus("");
 }
 
-function openCreateMeetModal() {
-    meetModalMode = "create";
+async function openCreateMeetModal() {
+  meetModalMode = "create";
   meetModalTitle.textContent = "New Meet";
   btnCreateMeetSave.textContent = "Create";
 
@@ -133,12 +121,12 @@ function openCreateMeetModal() {
   cVenue.value = "";
   cDate.value = "";
   cLocation.value = "";
-  //cSeason.value = "";
   cNotes.value = "";
+  await populateSeasonSelect(cSeason, null);
   createBackdrop.style.display = "flex";
 }
 
-function openEditMeetModal() {
+async function openEditMeetModal() {
   if (!currentMeetId || !currentMeet) return;
 
   meetModalMode = "edit";
@@ -150,8 +138,8 @@ function openEditMeetModal() {
   cVenue.value = currentMeet.venue_type || "";     // "indoor"/"outdoor"
   cDate.value = currentMeet.meet_date || "";
   cLocation.value = currentMeet.location || "";
-  //cSeason.value = currentMeet.season || "";
   cNotes.value = currentMeet.notes || "";
+  await populateSeasonSelect(cSeason, currentMeet.season_id);
 
   // clear any old validation UI
   cName.classList.remove("input-error");
@@ -160,14 +148,13 @@ function openEditMeetModal() {
   createBackdrop.style.display = "flex";
 }
 
-btnEditMeet.addEventListener("click", openEditMeetModal);
-
-
 function closeCreateMeetModal() {
   createBackdrop.style.display = "none";
 }
 
-btnNewMeet.addEventListener("click", openCreateMeetModal);
+btnNewMeet.addEventListener("click", () => openCreateMeetModal());
+btnEditMeet.addEventListener("click", () => openEditMeetModal());
+
 btnCloseCreate.addEventListener("click", closeCreateMeetModal);
 createBackdrop.addEventListener("click", (e) => {
   if (e.target === createBackdrop) closeCreateMeetModal();
@@ -193,7 +180,7 @@ btnCreateMeetSave.addEventListener("click", async () => {
     venue_type: cVenue.value || null,          // if dropdown
     meet_date: cDate.value || null,
     location: cLocation.value.trim() || null,
-    //season: cSeason.value.trim() || null,
+    season_id: cSeason.value === "" ? null : Number(cSeason.value),
     notes: cNotes.value.trim() || null,
   };
 
@@ -298,19 +285,23 @@ async function loadMeetPage() {
 
   currentMeet = data.meet;
   await loadSeasons();
-  renderMeetSeasonSelect(currentMeet);
-
   elMeetHeader.innerHTML = `<strong>${data.meet.name}</strong> <span class="muted">(${data.gender === "M" ? "Boys" : "Girls"})</span>`;
   elMeetEditor.style.display = "block";
   
   function capitalize(s) {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
+
+  const seasonName =
+    data.meet.season_id != null
+      ? (seasonsCache.find(s => String(s.season_id) === String(data.meet.season_id))?.name || null)
+      : null;
+
   const metaParts = [
     data.meet.venue_type ? `${capitalize(data.meet.venue_type)}` : null,
     data.meet.meet_date ? `${data.meet.meet_date}` : null,
     data.meet.location ? `${data.meet.location}` : null,
-    data.meet.season ? `${data.meet.season}` : null,
+    seasonName,
     (data.meet.is_varsity ? "Varsity" : null),
   ].filter(Boolean);
 

@@ -485,12 +485,25 @@ def list_meets():
 @app.post("/api/meets")
 def create_meet():
     data = request.get_json(force=True) or {}
+
+    season_id = data.get("season_id")
+    if season_id in ("", None):
+        season_id = None
+    else:
+        try:
+            season_id = int(season_id)
+        except (TypeError, ValueError):
+            return {"error": "season_id must be an integer or null"}, 400
+        if db.session.get(Season, season_id) is None:
+            return {"error": "season_id is not valid"}, 400
+
     m = Meet(
         org_id=CURRENT_ORG_ID,
         name=(data.get("name") or "New Meet").strip(),
         meet_date=data.get("meet_date"),
         location=data.get("location"),
         is_varsity=parse_bool(data.get("is_varsity"), False),
+        season_id=season_id,
         venue_type=(data.get("venue_type") or "outdoor").strip().lower(),
         notes=(str(data.get("notes")).strip() or None) if data.get("notes") is not None else None,
     )
