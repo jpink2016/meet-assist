@@ -395,6 +395,8 @@ function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new M
   }
 
   athletes.forEach((a) => {
+    const varsityMeets = Number(a.varsity_meets || 0);
+    const varsityText = `Varsity Meets: ${varsityMeets}`;
     const div = document.createElement("div");
     const athleteIdStr = String(a.athlete_id); 
     const isSelected = selectedSet.has(String(a.athlete_id));
@@ -402,16 +404,16 @@ function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new M
     const meta = [a.event_group_name,a.team_name].filter(Boolean).join(" • ");
     const badge = a.unavailable ? `<span class="badge badge-unavailable">Unavailable</span>` : "";
     const count = entryCountMap.get(athleteIdStr) || 0;
-    const countText = `${count} - Events Entered`;
+    const countText = `Events Entered: ${count}`;
+    const count_meta = [countText,varsityText].filter(Boolean).join(" • ")
 
     div.innerHTML = `
       <div class="ath-row-top">
         <strong>${a.last_name}, ${a.first_name}</strong>
         ${badge}
       </div>
-      <div class="muted ath-row-sub">${countText}</div>
-      <div class="muted ath-row-meta">${meta}</div>
-    `;
+      <div class="muted ath-row-sub">${count_meta}</div>
+      <div class="muted ath-row-meta">${meta}</div>    `;
 
     div.addEventListener("click", async () => {
       if (!selectedMeetEventId) {

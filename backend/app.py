@@ -2,7 +2,7 @@
 import os
 from flask import Flask, send_from_directory, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, inspect, and_
+from sqlalchemy import text, inspect, and_, func, distinct
 from sqlalchemy.exc import IntegrityError
 from datetime import date
 
@@ -556,6 +556,23 @@ def meet_page_bootstrap(meet_id):
     )
     meet_event_ids = [me.meet_event_id for (me, e, g) in meet_events]
 
+    varsity_counts = dict(
+        db.session.query(
+            MeetEntry.athlete_id,
+            func.count(distinct(MeetEvent.meet_id)).label("varsity_meets"),
+        )
+        .join(MeetEvent, MeetEntry.meet_event_id == MeetEvent.meet_event_id)
+        .join(Meet, MeetEvent.meet_id == Meet.meet_id)
+        .filter(
+            Meet.org_id == CURRENT_ORG_ID,
+            Meet.is_archived == False,
+            Meet.is_varsity == True,
+            MeetEntry.entry_status == "entered",
+            Meet.season_id == meet.season_id,
+        )
+        .group_by(MeetEntry.athlete_id)
+        .all()
+    )
     # entries for those meet events
     entries = []
     if meet_event_ids:
@@ -596,6 +613,7 @@ def meet_page_bootstrap(meet_id):
             **a.to_dict(),
             "team_name": (t.name if t else None),
             "event_group_name": (g.name if g else None),
+            "varsity_meets": int(varsity_counts.get(a.athlete_id, 0)),
         })
 
 
