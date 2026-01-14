@@ -693,6 +693,23 @@ def patch_meet(meet_id):
     db.session.commit()
     return jsonify(meet.to_dict())
 
+@app.get("/api/debug/groups-and-events")
+def debug_groups_and_events():
+    rows = (db.session.query(EventGroup, Event)
+        .join(Event, Event.event_group_id == EventGroup.event_group_id)
+        .order_by(EventGroup.sort_order.asc(), Event.sort_order.asc(), Event.name.asc())
+        .all()
+    )
+    out = []
+    for g, e in rows:
+        out.append({
+            "group": g.name,
+            "group_sort": g.sort_order,
+            "event": e.name,
+            "event_sort": e.sort_order,
+        })
+    return jsonify(out)
+
 @app.get("/api/seasons")
 def list_seasons():
     q = Season.query
@@ -715,22 +732,6 @@ def list_seasons():
 
     seasons = q.order_by(Season.year.desc(), Season.name.asc()).all()
     return jsonify([s.to_dict() for s in seasons]), 200
-@app.get("/api/debug/groups-and-events")
-def debug_groups_and_events():
-    rows = (db.session.query(EventGroup, Event)
-        .join(Event, Event.event_group_id == EventGroup.event_group_id)
-        .order_by(EventGroup.sort_order.asc(), Event.sort_order.asc(), Event.name.asc())
-        .all()
-    )
-    out = []
-    for g, e in rows:
-        out.append({
-            "group": g.name,
-            "group_sort": g.sort_order,
-            "event": e.name,
-            "event_sort": e.sort_order,
-        })
-    return jsonify(out)
 
 @app.post("/api/seasons")
 def create_season():

@@ -27,10 +27,18 @@
 
       <!-- Right: meet editor -->
       <div class="card">
-        <div class="row">
-          <div id="meetHeader">Select a meet on the left</div>
-          <div id="meetMeta" class="muted" style="margin-top:6px;"></div>
-          <div id="meetActions" style="display:none; gap:8px; align-items:center;">
+        <div class="row" style="justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div id="meetHeader">Select a meet on the left</div>
+            <div id="meetMeta" class="muted" style="margin-top:6px;"></div>
+          </div>
+
+          <div id="meetActions" style="display:none; display:flex; gap:12px; align-items:flex-end;">
+            <label class="field" style="min-width: 220px;">
+              <div class="muted">Season</div>
+              <select id="selMeetSeason"></select>
+            </label>
+
             <button class="btn" id="btnEditMeet">Edit</button>
             <button class="btn" id="btnArchiveMeet">Archive</button>
           </div>

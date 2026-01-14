@@ -5,6 +5,7 @@ let selectedMeetEventId = null;
 let currentMeet = null;
 let selectedAthleteIds = new Set(); // athlete_id strings
 let meetModalMode = "create"; // "create" | "edit"
+let seasonsCache = []; // [{season_id, name, year, discipline}]
 
 const elMeetList = document.getElementById("meetList");
 const elStatus = document.getElementById("status");
@@ -55,6 +56,48 @@ async function api(url, opts = {}) {
   try { json = text ? JSON.parse(text) : null; } catch {}
   if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
   return json;
+}
+// --------load seasons -------
+
+async function loadSeasons() {
+  // cache so we don't refetch constantly
+  if (seasonsCache.length) return seasonsCache;
+  seasonsCache = await api("/api/seasons");
+  return seasonsCache;
+}
+
+function renderMeetSeasonSelect(meet) {
+  const sel = document.getElementById("selMeetSeason");
+  if (!sel) return;
+
+  // Build options
+  const options = [
+    `<option value="">No season</option>`,
+    ...seasonsCache.map((s) => {
+      const label = `${s.year} ${s.discipline.toUpperCase()} — ${s.name}`;
+      const selected = String(meet.season_id ?? "") === String(s.season_id) ? "selected" : "";
+      return `<option value="${s.season_id}" ${selected}>${label}</option>`;
+    }),
+  ];
+
+  sel.innerHTML = options.join("");
+
+  // Ensure we don't double-bind handlers if loadMeetPage reruns
+  sel.onchange = async () => {
+    const v = sel.value; // "" or "123"
+    try {
+      await api(`/api/meets/${meet.meet_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ season_id: v === "" ? null : Number(v) }),
+      });
+      // reload to keep everything consistent (and so selection persists)
+      await loadMeetPage();
+    } catch (e) {
+      alert(e.message || "Failed to update season");
+      // revert UI back to previous value
+      renderMeetSeasonSelect(meet);
+    }
+  };
 }
 
 // -------------------- Meets list --------------------
@@ -254,6 +297,8 @@ async function loadMeetPage() {
   const data = await api(`/api/meets/${currentMeetId}/page?gender=${currentGender}`);
 
   currentMeet = data.meet;
+  await loadSeasons();
+  renderMeetSeasonSelect(currentMeet);
 
   elMeetHeader.innerHTML = `<strong>${data.meet.name}</strong> <span class="muted">(${data.gender === "M" ? "Boys" : "Girls"})</span>`;
   elMeetEditor.style.display = "block";
