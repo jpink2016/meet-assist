@@ -22,6 +22,7 @@ const elMeetNotes = document.getElementById("meetNotes");
 const elGroups = document.querySelector("#fEventGroups");
 const elTeams = document.querySelector("#fTeams");
 const elVarsity = document.querySelector("#fVarsityOnly");
+const elAvailable = document.querySelector("#fAvailableOnly");
 
 const elEventsCol = document.getElementById("eventsCol");
 const elAthletesCol = document.getElementById("athletesCol");
@@ -68,7 +69,7 @@ function initAthleteFilters(athletes) {
   fillSelect(elTeams, teams, "All teams");
 
   if (!filtersWired) {
-    [elGroups, elTeams, elVarsity].forEach(el =>
+    [elGroups, elTeams, elVarsity, elAvailable].forEach(el =>
       el?.addEventListener("change", rerenderAthletes)
     );
     filtersWired = true;
@@ -86,12 +87,13 @@ function getFilteredAthletes() {
   const group = elGroups?.value || "";
   const team  = elTeams?.value || "";
   const varsityOnly = !!elVarsity?.checked;
-
+  const availableOnly = !!elAvailable?.checked;
   return pageAthletes.filter(a => {
     const groupOk = !group || a.event_group_name === group;
     const teamOk  = !team  || a.team_name === team;
     const varsityOk = !varsityOnly || a.varsity === true;
-    return groupOk && teamOk && varsityOk;
+    const availableOk = !availableOnly || a.unavailable !== true;
+    return groupOk && teamOk && varsityOk && availableOk;
   });
 }
 function getSelectedAthleteIdSet(meetEvents, selectedMeetEventId) {

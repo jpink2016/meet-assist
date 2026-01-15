@@ -491,6 +491,7 @@ def list_meets():
         for m, s in rows
     ])
 
+
 @app.post("/api/meets")
 def create_meet():
     data = request.get_json(force=True) or {}
