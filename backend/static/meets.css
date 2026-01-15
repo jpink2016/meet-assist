@@ -47,15 +47,111 @@ body {
   padding-right: 4px;
 }
 
+/* Keep header/text normal (not sticky) */
 .scroll-col > .row,
 .scroll-col > strong,
 .scroll-col > .muted {
+  position: static;
+}
+
+/* Only filters sticky */
+.scroll-col > .filters {
   position: sticky;
   top: 0;
   background: white;
-  z-index: 1;
+  z-index: 2;
+  padding: 8px 0;           /* optional: gives breathing room */
+  border-bottom: 1px solid #eee; /* optional: separation */
 }
 
+.chip-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip-toggle span {
+  padding: 7px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: #f6f7f9;
+  font-size: 14px;
+  color: #222;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* selected state */
+.chip-toggle input:checked + span {
+  background: #e0e0e0;
+  border-color: #bdbdbd;
+}
+
+/* hover */
+.chip-toggle span:hover {
+  background: #f1f3f5;
+}
+/* =========================
+   Filters
+========================= */
+.filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filters select {
+  min-width: 140px;
+  padding: 5px 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  color: #222;
+}
+
+.filters select:focus {
+  outline: none;
+  border-color: #999;
+}
+
+.filters .checkbox-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f6f7f9;
+  font-size: 14px;
+}
+
+.filters .checkbox-row:hover {
+  background: #f1f3f5;
+}
+
+.filters input[type="checkbox"] {
+  accent-color: #555;
+}
 /* =========================
    Typography / Helpers
 ========================= */
@@ -107,6 +203,7 @@ li:hover {
   background: #fafafa;
 }
 
+.checkbox-row { display:flex; gap:8px; align-items:center; }
 /* =========================
    Tabs
 ========================= */
@@ -141,6 +238,7 @@ li:hover {
 .event.selected {
   border-color: #999;
   background: #fafafa;
+  border: 2px solid;
 }
 
 .event.is-selected {
@@ -160,6 +258,8 @@ li:hover {
 
 .pill {
   display: inline-block;
+  background: #f1f3f5;
+  color: #333;
   padding: 2px 8px;
   border: 1px solid #ddd;
   border-radius: 999px;

@@ -7,6 +7,10 @@ let selectedAthleteIds = new Set(); // athlete_id strings
 let meetModalMode = "create"; // "create" | "edit"
 let seasonsCache = []; // [{season_id, name, year, discipline}]
 
+let pageAthletes = [];
+let pageMeetEvents = [];
+let filtersWired = false;
+
 const elMeetList = document.getElementById("meetList");
 const elStatus = document.getElementById("status");
 const elMeetHeader = document.getElementById("meetHeader");
@@ -14,6 +18,10 @@ const elMeetEditor = document.getElementById("meetEditor");
 const elMeetActions = document.getElementById("meetActions");
 const elMeetMeta = document.getElementById("meetMeta");
 const elMeetNotes = document.getElementById("meetNotes");
+
+const elGroups = document.querySelector("#fEventGroups");
+const elTeams = document.querySelector("#fTeams");
+const elVarsity = document.querySelector("#fVarsityOnly");
 
 const elEventsCol = document.getElementById("eventsCol");
 const elAthletesCol = document.getElementById("athletesCol");
@@ -37,6 +45,55 @@ const cSeason = document.getElementById("cSeason");
 const cNotes = document.getElementById("cNotes");
 const hint = document.getElementById("cNameHint");
 
+
+function uniqueSorted(arr) {
+  return Array.from(new Set(arr.filter(Boolean))).sort((a,b) => a.localeCompare(b));
+}
+
+function getSelectedValues(selectEl) {
+  return Array.from(selectEl.selectedOptions).map(o => o.value);
+}
+
+function rerenderAthletes() {
+  const selectedSet = getSelectedAthleteIdSet(pageMeetEvents, selectedMeetEventId);
+  const entryCountMap = buildAthleteEntryCountMap(pageMeetEvents);
+  renderAthletes(getFilteredAthletes(), selectedSet, entryCountMap);
+}
+
+function initAthleteFilters(athletes) {
+  const groups = uniqueSorted(athletes.map(a => a.event_group_name));
+  const teams  = uniqueSorted(athletes.map(a => a.team_name));
+
+  fillSelect(elGroups, groups, "All groups");
+  fillSelect(elTeams, teams, "All teams");
+
+  if (!filtersWired) {
+    [elGroups, elTeams, elVarsity].forEach(el =>
+      el?.addEventListener("change", rerenderAthletes)
+    );
+    filtersWired = true;
+  }
+}
+
+function fillSelect(selectEl, options, allLabel) {
+  if (!selectEl) return;
+  selectEl.innerHTML =
+    `<option value="">${allLabel}</option>` +
+    options.map(v => `<option value="${v}">${v}</option>`).join("");
+}
+
+function getFilteredAthletes() {
+  const group = elGroups?.value || "";
+  const team  = elTeams?.value || "";
+  const varsityOnly = !!elVarsity?.checked;
+
+  return pageAthletes.filter(a => {
+    const groupOk = !group || a.event_group_name === group;
+    const teamOk  = !team  || a.team_name === team;
+    const varsityOk = !varsityOnly || a.varsity === true;
+    return groupOk && teamOk && varsityOk;
+  });
+}
 function getSelectedAthleteIdSet(meetEvents, selectedMeetEventId) {
   const me = meetEvents.find(x => String(x.meet_event_id) === String(selectedMeetEventId));
   const ids = (me?.entries || []).map(e => String(e.athlete_id));
@@ -313,10 +370,11 @@ async function loadMeetPage() {
   elMeetActions.style.display = "flex";
   btnArchiveMeet.textContent = currentMeet.is_archived ? "Unarchive" : "Archive";
 
-  renderEvents(data.meet_events);
-  const selectedSet = getSelectedAthleteIdSet(data.meet_events, selectedMeetEventId);
-  const entryCountMap = buildAthleteEntryCountMap(data.meet_events);
-  renderAthletes(data.athletes, selectedSet, entryCountMap);
+  pageMeetEvents = data.meet_events || [];
+  pageAthletes = data.athletes || [];
+  renderEvents(pageMeetEvents);
+  initAthleteFilters(pageAthletes);
+  rerenderAthletes();
 
   setStatus("");
 }
@@ -384,7 +442,6 @@ function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new M
     elAthletesCol.innerHTML = `<div class="muted">No athletes found for this gender.</div>`;
     return;
   }
-
   athletes.forEach((a) => {
     const varsityMeets = Number(a.varsity_meets || 0);
     const varsityText = `Varsity Meets: ${varsityMeets}`;
