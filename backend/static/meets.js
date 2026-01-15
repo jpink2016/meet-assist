@@ -114,8 +114,8 @@ async function api(url, opts = {}) {
   if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
   return json;
 }
-// --------load seasons -------
 
+// --------load seasons -------
 async function loadSeasons() {
   // cache so we don't refetch constantly
   if (seasonsCache.length) return seasonsCache;
@@ -143,7 +143,6 @@ async function populateSeasonSelect(selectEl, selectedSeasonId = null) {
     selectEl.appendChild(opt);
   });
 }
-
 
 // -------------------- Meets list --------------------
 async function loadMeets() {
@@ -493,21 +492,81 @@ function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new M
   });
 }
 
+
 // -------------------- Add event to meet --------------------
+const addEventBackdrop = document.getElementById("addEventBackdrop");
+const btnCloseAddEvent = document.getElementById("btnCloseAddEvent");
+const btnConfirmAddEvent = document.getElementById("btnConfirmAddEvent");
+const addEventSelect = document.getElementById("addEventSelect");
+
+let eventsCache = [];
+let eventsWired = false;
+
+function closeAddEventModal() {
+  addEventBackdrop.style.display = "none";
+}
+
+function openAddEventModal() {
+  addEventBackdrop.style.display = "flex";
+  addEventSelect.value = "";
+}
+
+function renderAddEventOptions(events) {
+  if (!addEventSelect) return;
+
+  addEventSelect.innerHTML =
+    `<option value="">— Select an event —</option>` +
+    (events || []).map(e => `<option value="${e.event_id}">${e.name}</option>`).join("");
+}
+
+async function ensureEventsLoaded() {
+  if (eventsCache.length) return eventsCache;
+  eventsCache = await api("/api/events");
+  return eventsCache;
+}
+
+function wireAddEventModalOnce() {
+  if (eventsWired) return;
+
+  btnCloseAddEvent.addEventListener("click", closeAddEventModal);
+  addEventBackdrop.addEventListener("click", (e) => {
+    if (e.target === addEventBackdrop) closeAddEventModal();
+  });
+
+  btnConfirmAddEvent.addEventListener("click", async () => {
+    const eventId = addEventSelect.value;
+    if (!eventId) return alert("Select an event first.");
+
+    try {
+      await api(`/api/meets/${currentMeetId}/meet-events`, {
+        method: "POST",
+        body: JSON.stringify({
+          event_id: Number(eventId),
+          gender: currentGender,
+          sort_order: 0,
+        }),
+      });
+      closeAddEventModal();
+      await loadMeetPage();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  eventsWired = true;
+}
+
+
 btnAddEvent.addEventListener("click", async () => {
   if (!currentMeetId) return;
 
-  // Super simple picker for MVP: prompt for event_id
-  // Next step we’ll replace this with a nice dropdown using GET /api/events.
-  const eventId = prompt("Enter event_id to add (we’ll build a picker next):");
-  if (!eventId) return;
-
   try {
-    await api(`/api/meets/${currentMeetId}/meet-events`, {
-      method: "POST",
-      body: JSON.stringify({ event_id: Number(eventId), gender: currentGender, sort_order: 0 }),
-    });
-    await loadMeetPage();
+    const events = await ensureEventsLoaded();
+    console.log("events loaded:", events.length, events[0]); // <- remove later
+
+    wireAddEventModalOnce();
+    renderAddEventOptions(events);  // <- populate BEFORE showing modal
+    openAddEventModal();
   } catch (e) {
     alert(e.message);
   }

@@ -151,6 +151,32 @@
         </div>
       </div>
     </div>
+
+    <div id="addEventBackdrop" class="modal-backdrop" style="display:none;">
+      <div class="card modal" style="max-width:520px;">
+        <div class="row">
+          <strong>Add Event</strong>
+          <button class="btn" id="btnCloseAddEvent">Close</button>
+        </div>
+
+        <div style="margin-top:10px; display:grid; gap:10px;">
+
+          <label>
+            <div class="muted">Event</div>
+            <select id="addEventSelect"
+                    style="width:100%; padding:8px; border:1px solid #ccc; border-radius:10px;">
+              <option value="">— Select an event —</option>
+            </select>
+          </label>
+
+          <div class="row">
+            <div></div>
+            <button class="btn" id="btnConfirmAddEvent">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="/static/meets.js"></script>
   </body>
 </html>
