@@ -623,12 +623,20 @@ def meet_page_bootstrap(meet_id):
     payload_athletes = []
     for a, t, g in ath_rows:
         payload_athletes.append({
-            **a.to_dict(),
-            "team_name": (t.name if t else None),
-            "event_group_name": (g.name if g else None),
-            "varsity_meets": int(varsity_counts.get(a.athlete_id, 0)),
+        "athlete_id": a.athlete_id,
+        "first_name": a.first_name,
+        "last_name": a.last_name,
+        "gender": a.gender,
+        "grad_year": a.grad_year,
+        "is_active": a.is_active,
+        "unavailable": a.unavailable,
+        "team_id": a.team_id,
+        "team_name": (t.name if t else None),
+        "event_group_id": a.event_group_id,
+        "event_group_name": (g.name if g else None),
+        "varsity_meets": int(varsity_counts.get(a.athlete_id, 0)),
+        "varsity": bool(a.varsity) if hasattr(a, "varsity") else (int(varsity_counts.get(a.athlete_id, 0)) > 0),
         })
-
 
     payload_meet_events = []
     for me, ev, grp in meet_events:
