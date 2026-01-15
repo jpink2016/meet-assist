@@ -473,14 +473,23 @@ def update_athlete(athlete_id: int):
     return jsonify(a.to_dict()), 200
 
 # ------- meet apis ---------
-
 @app.get("/api/meets")
 def list_meets():
-    meets = (Meet.query
-             .filter_by(org_id=CURRENT_ORG_ID, is_archived=False)
-             .order_by(Meet.meet_date.desc().nullslast(), Meet.meet_id.desc())
-             .all())
-    return jsonify([m.to_dict() for m in meets])
+    rows = (
+        db.session.query(Meet, Season)
+        .outerjoin(Season, Meet.season_id == Season.season_id)
+        .filter(Meet.org_id == CURRENT_ORG_ID, Meet.is_archived == False)
+        .order_by(Meet.meet_date.desc().nullslast(), Meet.meet_id.desc())
+        .all()
+    )
+
+    return jsonify([
+        {
+            **m.to_dict(),
+            "season_name": s.name if s else None,
+        }
+        for m, s in rows
+    ])
 
 @app.post("/api/meets")
 def create_meet():

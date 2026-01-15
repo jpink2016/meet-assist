@@ -160,7 +160,13 @@ async function loadMeets() {
   meets.forEach((m) => {
     const li = document.createElement("li");
     const when = m.meet_date ? ` • ${m.meet_date}` : "";
-    li.innerHTML = `<div><strong>${m.name}</strong><div class="muted">${m.location || "—"}${when}</div></div>`;
+    li.innerHTML = `
+      <div>
+        <strong>${m.name}</strong>
+        ${m.season_name ? `<span class="muted"> • ${m.season_name}</span>` : ""}
+        <div class="muted">${m.location || "—"}${when}</div>
+      </div>
+    `;
     li.addEventListener("click", () => openMeet(m.meet_id));
     elMeetList.appendChild(li);
   });
@@ -460,8 +466,8 @@ function renderAthletes(athletes, selectedSet = new Set(), entryCountMap = new M
         <strong>${a.last_name}, ${a.first_name}</strong>
         ${badge}
       </div>
-      <div class="muted ath-row-sub">${count_meta}</div>
-      <div class="muted ath-row-meta">${meta}</div>    `;
+      <div class="muted ath-row-sub">${meta}</div>
+      <div class="muted ath-row-meta">${count_meta}</div>    `;
 
     div.addEventListener("click", async () => {
       if (!selectedMeetEventId) {
